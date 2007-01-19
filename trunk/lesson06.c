@@ -12,18 +12,34 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <GL/gl.h>
-#include <GL/glu.h>
+
+#include <SDL_opengl.h>
 #include "SDL.h"
+#include <SDL/SDL_image.h>
+
+#include <math.h>
+#include <string.h> // for memcpy
 
 /* screen width, height, and bit depth */
-#define SCREEN_WIDTH  640
+#define SCREEN_WIDTH 640
 #define SCREEN_HEIGHT 480
-#define SCREEN_BPP     16
+#define SCREEN_BPP     0
+#define FULL_SCREEN_WIDTH 1680
+#define FULL_SCREEN_HEIGHT 1050
+
 
 /* Set up some booleans */
 #define TRUE  1
 #define FALSE 0
+
+#define SQR(A)                (A * A)
+#define NORMALIZE3(A)          {double l=1.0/sqrt( SQR(A.x) + SQR(A.y) + SQR(A.z) ); A.x*=l; A.y*=l; A.z*=l;}
+#define SET_VECTOR3(V,X,Y,Z)  {V.x=X; V.y=Y; V.z=Z;}
+#define SET_VERTEX3(V,X,Y,Z)  (SET_VECTOR3(V,X,Y,Z))
+
+#define NORMALIZE2(A)          {double l=1.0/sqrt( SQR(A.x) + SQR(A.y) ); A.x*=l; A.y*=l;}
+#define SET_VECTOR2(V,X,Y)  {V.x=X; V.y=Y;}
+#define SET_VERTEX2(V,X,Y)  (SET_VECTOR2(V,X,Y))
 
 /* This is our SDL surface */
 SDL_Surface *surface;
@@ -33,6 +49,34 @@ GLfloat yrot; /* Y Rotation ( NEW ) */
 GLfloat zrot; /* Z Rotation ( NEW ) */
 
 GLuint texture[1]; /* Storage For One Texture ( NEW ) */
+
+int g_img_width = 0;
+int g_img_height = 0;
+
+// TODO there should be a struct like this defined somewhere in SDL, SDL_Color is close but contains alpha too
+typedef struct
+{
+	Uint8 r;
+	Uint8 g;
+	Uint8 b;
+} MyRGB;
+
+typedef struct
+{
+	double x;
+	double y;
+	double z;
+} vertex3_t, vector3_t;
+
+typedef struct
+{
+	double x;
+	double y;
+} vertex2_t;
+
+/* Flags to pass to SDL_SetVideoMode */
+int videoFlags;
+
 
 /* function to release/destroy our resources and restoring the old desktop */
 void Quit( int returnCode )
@@ -44,18 +88,53 @@ void Quit( int returnCode )
 	exit( returnCode );
 }
 
+
 /* function to load in bitmap as a GL texture */
 int LoadGLTextures( )
 {
 	/* Status indicator */
 	int Status = FALSE;
 
+	const char image_name[] = "/home/leif/code/twister/src/data/talladega_nights.jpg";
+	//const char image_name[] = "/home/leif/code/twister/src/data/talladega_nights_1024_black.jpg";
+	//const char image_name[] = "data/nehe.bmp";
+	
 	/* Create storage space for the texture */
 	SDL_Surface *TextureImage[1]; 
 
-	/* Load The Bitmap, Check For Errors, If Bitmap's Not Found Quit */
-	if ( ( TextureImage[0] = SDL_LoadBMP( "data/nehe.bmp" ) ) )
+	/* Load The image, Check For Errors, If image's Not Found Quit */
+	if ( ( TextureImage[0] = IMG_Load( image_name ) ) )
 	{
+		g_img_width = TextureImage[0]->w;
+		g_img_height = TextureImage[0]->h;
+
+		MyRGB buffer[1024][1024];
+
+		// HACK - pad image with black to fit in 1024x1024 texture
+		//
+		// FIXME - instead of using MyRGB I should use getpixel() and putpixel():
+		// http://docs.mandragor.org/files/Common_libs_documentation/SDL/SDL_Documentation_project_en/guidevideo.html#AEN90
+		// and then to extract the colors out of the Uint32:
+		// http://docs.mandragor.org/files/Common_libs_documentation/SDL/SDL_Documentation_project_en/sdlpixelformat.html
+		{
+			// set to black
+			memset( buffer, 0, 1024*1024*sizeof(MyRGB) );
+
+			int i;
+			int offset;
+			for( i=0, offset=0; i<TextureImage[0]->h; i++)
+			{
+				memcpy( buffer[i], (void*)&((MyRGB*)TextureImage[0]->pixels)[offset], TextureImage[0]->w * sizeof(MyRGB) );
+
+				offset += TextureImage[0]->w;
+			}
+		}
+		
+		/*
+		int offset = 1024;
+		const MyRGB & color = ((MyRGB *)TextureImage[0]->pixels)[offset];
+		fprintf( stdout, "color %u %u %u\n", color.r, color.g, color.b  );
+		*/
 
 		/* Set the status to true */
 		Status = TRUE;
@@ -67,13 +146,21 @@ int LoadGLTextures( )
 		glBindTexture( GL_TEXTURE_2D, texture[0] );
 
 		/* Generate The Texture */
-		glTexImage2D( GL_TEXTURE_2D, 0, 3, TextureImage[0]->w,
-				TextureImage[0]->h, 0, GL_BGR,
-				GL_UNSIGNED_BYTE, TextureImage[0]->pixels );
+
+		GLint level_of_detail;
+	   level_of_detail = 0; /* highest quality	*/
+
+		//glTexImage2D( GL_TEXTURE_2D, level_of_detail, GL_RGB, TextureImage[0]->w, TextureImage[0]->h, 0, GL_RGB, GL_UNSIGNED_BYTE, TextureImage[0]->pixels );
+		glTexImage2D( GL_TEXTURE_2D, level_of_detail, GL_RGB, 1024, 1024, 0, GL_RGB, GL_UNSIGNED_BYTE, buffer );
 
 		/* Linear Filtering */
+		// change GL_LINEAR to GL_NEAREST to make faster, but looks kinda ugly when image is stretch in fullscreen
 		glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR );
 		glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR );
+	}
+	else
+	{
+		fprintf( stderr, "Failed to load image %s\n", image_name );
 	}
 
 	/* Free up any memory we may have used */
@@ -130,7 +217,50 @@ void handleKeyPress( SDL_keysym *keysym )
 			/* F1 key was pressed
 			 * this toggles fullscreen mode
 			 */
-			SDL_WM_ToggleFullScreen( surface );
+
+			static int fullscreen_on = false;
+			int width, height;
+
+			if( !fullscreen_on )
+			{
+				fprintf( stdout, "going fullscreen\n");
+
+				width = FULL_SCREEN_WIDTH;
+				height = FULL_SCREEN_HEIGHT;
+
+				fullscreen_on = 1;
+
+				if ( !SDL_SetVideoMode( width, height, SCREEN_BPP, videoFlags ) ) // 1
+				{
+					fprintf( stderr,  "Video mode set failed: %s\n", SDL_GetError( ) );
+					Quit( 1 );
+				}
+
+				resizeWindow( width, height ); // 2
+
+				SDL_WM_ToggleFullScreen( surface ); // 3
+			}
+			else
+			{
+				fprintf( stdout, "leaving fullscreen\n");
+
+				width = SCREEN_WIDTH;
+				height = SCREEN_HEIGHT;
+
+				fullscreen_on = 0;
+
+				// do in opposite order of going full screen
+				SDL_WM_ToggleFullScreen( surface ); // 1
+
+				resizeWindow( width, height ); // 2
+
+				if ( !SDL_SetVideoMode( width, height, SCREEN_BPP, videoFlags ) ) // 3
+				{
+					fprintf( stderr,  "Video mode set failed: %s\n", SDL_GetError( ) );
+					Quit( 1 );
+				}
+			}
+
 			break;
 		default:
 			break;
@@ -142,6 +272,9 @@ void handleKeyPress( SDL_keysym *keysym )
 /* general OpenGL initialization function */
 int initGL( GLvoid )
 {
+	printf ("OpenGL version: %s\n", glGetString (GL_VERSION));
+	printf ("OpenGL vendor: %s\n", glGetString (GL_VENDOR));
+	printf ("OpenGL renderer: %s\n", glGetString (GL_RENDERER));
 
 	/* Load in the texture */
 	if ( !LoadGLTextures( ) )
@@ -151,7 +284,7 @@ int initGL( GLvoid )
 	glEnable( GL_TEXTURE_2D );
 
 	/* Enable smooth shading */
-	glShadeModel( GL_SMOOTH );
+	glShadeModel( GL_FLAT );
 
 	/* Set the background black */
 	glClearColor( 0.0f, 0.0f, 0.0f, 0.5f );
@@ -166,7 +299,8 @@ int initGL( GLvoid )
 	glDepthFunc( GL_LEQUAL );
 
 	/* Really Nice Perspective Calculations */
-	glHint( GL_PERSPECTIVE_CORRECTION_HINT, GL_NICEST );
+	//glHint( GL_PERSPECTIVE_CORRECTION_HINT, GL_NICEST ); // slower and little benefit for flat texture
+	glHint( GL_PERSPECTIVE_CORRECTION_HINT, GL_FASTEST );
 
 	return( TRUE );
 }
@@ -174,6 +308,8 @@ int initGL( GLvoid )
 /* Here goes our drawing code */
 int drawGLScene( GLvoid )
 {
+	//fprintf( stdout, "starting drawGLScene\n" );
+
 	/* These are to calculate our fps */
 	static GLint T0     = 0;
 	static GLint Frames = 0;
@@ -181,16 +317,21 @@ int drawGLScene( GLvoid )
 	/* Clear The Screen And The Depth Buffer */
 	glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );
 
-	/* Move Into The Screen 5 Units */
+	/* Move Into The Screen */
 	glLoadIdentity( );
-	glTranslatef( 0.0f, 0.0f, -5.0f );
+	glTranslatef( 0.0f, 0.0f, -2.5f );
 
-	glRotatef( xrot, 1.0f, 0.0f, 0.0f); /* Rotate On The X Axis */
-	glRotatef( yrot, 0.0f, 1.0f, 0.0f); /* Rotate On The Y Axis */
+#ifdef SPIN
+//	glRotatef( xrot, 1.0f, 0.0f, 0.0f); /* Rotate On The X Axis */
+//	glRotatef( yrot, 0.0f, 1.0f, 0.0f); /* Rotate On The Y Axis */
 	glRotatef( zrot, 0.0f, 0.0f, 1.0f); /* Rotate On The Z Axis */
+#endif
 
 	/* Select Our Texture */
 	glBindTexture( GL_TEXTURE_2D, texture[0] );
+
+	const int half_width = g_img_width /2;
+	const int half_height = g_img_height / 2;
 
 	/* NOTE:
 	 *   The x coordinates of the glTexCoord2f function need to inverted
@@ -201,14 +342,53 @@ int drawGLScene( GLvoid )
 	glBegin(GL_QUADS);
 	/* Front Face */
 	/* Bottom Left Of The Texture and Quad */
-	glTexCoord2f( 0.0f, 1.0f ); glVertex3f( -1.0f, -1.0f, 1.0f );
-	/* Bottom Right Of The Texture and Quad */
-	glTexCoord2f( 1.0f, 1.0f ); glVertex3f(  1.0f, -1.0f, 1.0f );
-	/* Top Right Of The Texture and Quad */
-	glTexCoord2f( 1.0f, 0.0f ); glVertex3f(  1.0f,  1.0f, 1.0f );
-	/* Top Left Of The Texture and Quad */
-	glTexCoord2f( 0.0f, 0.0f ); glVertex3f( -1.0f,  1.0f, 1.0f );
+	{
+		glTexCoord2f( 0.0f, (double)g_img_height/1024 ); 
 
+		{
+			vertex3_t bot_left;
+			SET_VERTEX3( bot_left, -1.0f * half_width, -1.0f * half_height,1.0f );
+			NORMALIZE3( bot_left );
+			glVertex3f( bot_left.x, bot_left.y, bot_left.z );
+		}
+	}
+
+	/* Bottom Right Of The Texture and Quad */
+	{
+		glTexCoord2f( (double)g_img_width/1024, (double)g_img_height/1024 ); 
+
+		{
+			vertex3_t bot_right;
+			SET_VERTEX3( bot_right, 1.0f * half_width, -1.0f * half_height, 1.0f );
+			NORMALIZE3( bot_right );
+			glVertex3f( bot_right.x, bot_right.y, bot_right.z );
+		}
+	}
+
+	/* Top Right Of The Texture and Quad */
+	{
+		glTexCoord2f( (double)g_img_width/1024, 0.0f ); 
+
+		{
+			vertex3_t top_right;
+			SET_VERTEX3( top_right, 1.0f * half_width,  1.0f * half_height, 1.0f );
+			NORMALIZE3( top_right );
+			glVertex3f( top_right.x, top_right.y, top_right.z ); 
+		}
+	}
+
+	/* Top Left Of The Texture and Quad */
+	{
+
+		glTexCoord2f( 0.0f, 0.0f ); // this coord does not have to be offset b/c it's 0
+
+		vertex3_t top_left;
+		SET_VERTEX3( top_left, -1.0f * half_width,  1.0f * half_height, 1.0f );
+		NORMALIZE3( top_left );
+		glVertex3f( top_left.x, top_left.y, top_left.z );
+	}
+
+#ifdef DRAW_CUBE
 	/* Back Face */
 	/* Bottom Right Of The Texture and Quad */
 	glTexCoord2f( 0.0f, 0.0f ); glVertex3f( -1.0f, -1.0f, -1.0f );
@@ -258,6 +438,8 @@ int drawGLScene( GLvoid )
 	glTexCoord2f( 0.0f, 1.0f ); glVertex3f( -1.0f,  1.0f,  1.0f );
 	/* Top Left Of The Texture and Quad */
 	glTexCoord2f( 1.0f, 1.0f ); glVertex3f( -1.0f,  1.0f, -1.0f );
+#endif
+
 	glEnd( );
 
 	/* Draw it to the screen */
@@ -276,17 +458,19 @@ int drawGLScene( GLvoid )
 		}
 	}
 
+#ifdef SPIN
 	xrot += 0.3f; /* X Axis Rotation */
 	yrot += 0.2f; /* Y Axis Rotation */
 	zrot += 0.4f; /* Z Axis Rotation */
+#endif
+
+//	fprintf( stdout, "done drawGLScene\n" );
 
 	return( TRUE );
 }
 
 int main( int argc, char **argv )
 {
-	/* Flags to pass to SDL_SetVideoMode */
-	int videoFlags;
 	/* main loop variable */
 	int done = FALSE;
 	/* used to collect events */
@@ -299,18 +483,21 @@ int main( int argc, char **argv )
 	/* initialize SDL */
 	if ( SDL_Init( SDL_INIT_VIDEO ) < 0 )
 	{
-		fprintf( stderr, "Video initialization failed: %s\n",
-				SDL_GetError( ) );
+		fprintf( stderr, "Video initialization failed: %s\n", SDL_GetError( ) );
 		Quit( 1 );
 	}
+
+	char video_driver[32];
+
+	SDL_VideoDriverName( video_driver, sizeof(video_driver) );
+	fprintf( stdout, "video driver: %s\n", video_driver );
 
 	/* Fetch the video info */
 	videoInfo = SDL_GetVideoInfo( );
 
 	if ( !videoInfo )
 	{
-		fprintf( stderr, "Video query failed: %s\n",
-				SDL_GetError( ) );
+		fprintf( stderr, "Video query failed: %s\n", SDL_GetError( ) );
 		Quit( 1 );
 	}
 
@@ -319,23 +506,32 @@ int main( int argc, char **argv )
 	videoFlags |= SDL_GL_DOUBLEBUFFER; /* Enable double buffering */
 	videoFlags |= SDL_HWPALETTE;       /* Store the palette in hardware */
 	videoFlags |= SDL_RESIZABLE;       /* Enable window resizing */
+	videoFlags |= SDL_ANYFORMAT;
 
 	/* This checks to see if surfaces can be stored in memory */
 	if ( videoInfo->hw_available )
+	{
+		fprintf( stdout, "2d hardware accelerated\n" );
 		videoFlags |= SDL_HWSURFACE;
+	}
 	else
+	{
+		fprintf( stdout, "no 2d hardware acceleration found\n" );
 		videoFlags |= SDL_SWSURFACE;
+	}
 
 	/* This checks if hardware blits can be done */
 	if ( videoInfo->blit_hw )
+	{
+		fprintf( stdout, "using hardware blits\n" );
 		videoFlags |= SDL_HWACCEL;
+	}
 
 	/* Sets up OpenGL double buffering */
 	SDL_GL_SetAttribute( SDL_GL_DOUBLEBUFFER, 1 );
 
 	/* get a SDL surface */
-	surface = SDL_SetVideoMode( SCREEN_WIDTH, SCREEN_HEIGHT, SCREEN_BPP,
-			videoFlags );
+	surface = SDL_SetVideoMode( SCREEN_WIDTH, SCREEN_HEIGHT, SCREEN_BPP, videoFlags );
 
 	/* Verify there is a surface */
 	if ( !surface )
@@ -371,9 +567,7 @@ int main( int argc, char **argv )
 					break;			    
 				case SDL_VIDEORESIZE:
 					/* handle resize event */
-					surface = SDL_SetVideoMode( event.resize.w,
-							event.resize.h,
-							16, videoFlags );
+					surface = SDL_SetVideoMode( event.resize.w, event.resize.h, 16, videoFlags );
 					if ( !surface )
 					{
 						fprintf( stderr, "Could not get a surface after resize: %s\n", SDL_GetError( ) );
@@ -395,7 +589,7 @@ int main( int argc, char **argv )
 		}
 
 		/* draw the scene */
-		if ( isActive )
+		//if ( isActive )
 			drawGLScene( );
 	}
 
