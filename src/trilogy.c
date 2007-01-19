@@ -20,6 +20,14 @@
 #include <math.h>
 #include <string.h> // for memcpy
 
+#include <string>
+#include <vector>
+#include <iostream>
+
+#include "list_files.h"
+
+using namespace std;
+
 /* screen width, height, and bit depth */
 #define SCREEN_WIDTH 640
 #define SCREEN_HEIGHT 480
@@ -52,6 +60,9 @@ GLuint texture[1]; /* Storage For One Texture ( NEW ) */
 
 int g_img_width = 0;
 int g_img_height = 0;
+
+vector<string> g_files; // name of all possible movie covers to cycle through
+string g_texture; // name of current texture to be drawn
 
 // TODO there should be a struct like this defined somewhere in SDL, SDL_Color is close but contains alpha too
 typedef struct
@@ -90,23 +101,24 @@ void Quit( int returnCode )
 
 
 /* function to load in bitmap as a GL texture */
-int LoadGLTextures( )
+int LoadGLTextures( const string & image_name )
 {
 	/* Status indicator */
 	int Status = FALSE;
 
-	const char image_name[] = "/home/leif/code/twister/src/data/talladega_nights.jpg";
-	//const char image_name[] = "/home/leif/code/twister/src/data/talladega_nights_1024_black.jpg";
-	//const char image_name[] = "data/nehe.bmp";
-	
 	/* Create storage space for the texture */
 	SDL_Surface *TextureImage[1]; 
 
 	/* Load The image, Check For Errors, If image's Not Found Quit */
-	if ( ( TextureImage[0] = IMG_Load( image_name ) ) )
+	if ( ( TextureImage[0] = IMG_Load( image_name.c_str() ) ) )
 	{
 		g_img_width = TextureImage[0]->w;
 		g_img_height = TextureImage[0]->h;
+
+		if( g_img_width >= 1024 || g_img_height >= 1024 )
+		{
+			return FALSE;
+		}
 
 		MyRGB buffer[1024][1024];
 
@@ -160,7 +172,7 @@ int LoadGLTextures( )
 	}
 	else
 	{
-		fprintf( stderr, "Failed to load image %s\n", image_name );
+		fprintf( stderr, "Failed to load image %s\n", image_name.c_str() );
 	}
 
 	/* Free up any memory we may have used */
@@ -202,6 +214,27 @@ int resizeWindow( int width, int height )
 	glLoadIdentity( );
 
 	return( TRUE );
+}
+
+void draw_next_image()
+{
+	static vector<string>::const_iterator it = g_files.begin();
+
+	if( it == g_files.end() )
+	{
+		cout << "no more images" << endl;
+		return;
+	}
+
+	g_texture = *it;;
+	cout << "drawing " << g_texture << endl;
+	++it;
+
+	if ( !LoadGLTextures( g_texture ) )
+	{
+		cout << "problem loading texture " << g_texture << endl;
+	}
+
 }
 
 /* function to handle key press events */
@@ -262,6 +295,16 @@ void handleKeyPress( SDL_keysym *keysym )
 			}
 
 			break;
+		case SDLK_RIGHT:
+
+			draw_next_image();
+
+			break;
+		case SDLK_LEFT:
+
+			// TODO
+			
+			break;
 		default:
 			break;
 	}
@@ -277,7 +320,7 @@ int initGL( GLvoid )
 	printf ("OpenGL renderer: %s\n", glGetString (GL_RENDERER));
 
 	/* Load in the texture */
-	if ( !LoadGLTextures( ) )
+	if ( !LoadGLTextures( g_texture ) )
 		return FALSE;
 
 	/* Enable Texture Mapping ( NEW ) */
@@ -469,8 +512,30 @@ int drawGLScene( GLvoid )
 	return( TRUE );
 }
 
+
+void init( const string & path )
+{
+
+	// c'mon, do it!
+	try
+	{
+		g_files = get_files( path );
+		draw_next_image();
+	}
+	catch( const string & err )
+	{
+		cout << err << endl;
+	}
+}
+
 int main( int argc, char **argv )
 {
+	if( argc < 2 )
+	{
+		cout << "USAGE: " << argv[0] << " directory" << endl;
+		return -1;
+	}
+
 	/* main loop variable */
 	int done = FALSE;
 	/* used to collect events */
@@ -539,6 +604,8 @@ int main( int argc, char **argv )
 		fprintf( stderr,  "Video mode set failed: %s\n", SDL_GetError( ) );
 		Quit( 1 );
 	}
+
+	init( argv[1] );
 
 	/* initialize OpenGL */
 	initGL( );
