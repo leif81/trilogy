@@ -4,11 +4,11 @@ CFLAGS = `sdl-config --cflags`
 LIBS = -lGL -lGLU `sdl-config --libs` -lSDL_image
 
 all:
-	$(CC) lesson06.c -o lesson06 $(CFLAGS) $(LIBS)
+	$(CC) trilogy.c -o trilogy $(CFLAGS) $(LIBS)
 
 clean:
 	@echo Cleaning up...
-	@rm lesson06
+	@rm trilogy
 	@echo Done.
 
 tags:
