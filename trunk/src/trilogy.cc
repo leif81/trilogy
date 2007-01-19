@@ -109,6 +109,12 @@ int LoadGLTextures( const string & image_name )
 	/* Create storage space for the texture */
 	SDL_Surface *TextureImage[1]; 
 
+	if( !IMG_isJPG( SDL_RWFromFile( image_name.c_str(), "rb") ) )
+	{
+		cout << "image is not jpg" << endl;
+		return FALSE;
+	}
+
 	/* Load The image, Check For Errors, If image's Not Found Quit */
 	if ( ( TextureImage[0] = IMG_Load( image_name.c_str() ) ) )
 	{
@@ -117,6 +123,7 @@ int LoadGLTextures( const string & image_name )
 
 		if( g_img_width >= 1024 || g_img_height >= 1024 )
 		{
+			cout << "image is too big" << endl;
 			return FALSE;
 		}
 
@@ -220,19 +227,26 @@ void draw_next_image()
 {
 	static vector<string>::const_iterator it = g_files.begin();
 
-	if( it == g_files.end() )
+	while(1)
 	{
-		cout << "no more images" << endl;
-		return;
-	}
+		if( it == g_files.end() )
+		{
+			cout << "no more images" << endl;
+			return;
+		}
 
-	g_texture = *it;;
-	cout << "drawing " << g_texture << endl;
-	++it;
+		g_texture = *it;;
+		cout << "drawing " << g_texture << endl;
+		++it;
 
-	if ( !LoadGLTextures( g_texture ) )
-	{
-		cout << "problem loading texture " << g_texture << endl;
+		if ( !LoadGLTextures( g_texture ) )
+		{
+			cout << "problem loading texture " << g_texture << endl;
+		}
+		else
+		{
+			break;
+		}
 	}
 
 }
