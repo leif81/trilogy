@@ -4,7 +4,7 @@ CFLAGS = `sdl-config --cflags`
 LIBS = -lGL -lGLU `sdl-config --libs` -lSDL_image
 
 all:
-	$(CC) trilogy.c list_files.cc -o trilogy $(CFLAGS) $(LIBS)
+	$(CC) trilogy.cc list_files.cc -o trilogy $(CFLAGS) $(LIBS)
 
 clean:
 	@echo Cleaning up...
