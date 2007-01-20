@@ -99,6 +99,38 @@ void Quit( int returnCode )
 	exit( returnCode );
 }
 
+/*
+ * Return the pixel value at (x, y)
+ * NOTE: The surface must be locked before calling this!
+ * http://docs.mandragor.org/files/Common_libs_documentation/SDL/SDL_Documentation_project_en/guidevideo.html#AEN90
+ */
+Uint32 getpixel(SDL_Surface *surface, int x, int y)
+{
+	int bpp = surface->format->BytesPerPixel;
+	/* Here p is the address to the pixel we want to retrieve */
+	Uint8 *p = (Uint8 *)surface->pixels + y * surface->pitch + x * bpp;
+
+	switch(bpp) {
+		case 1:
+			return *p;
+
+		case 2:
+			return *(Uint16 *)p;
+
+		case 3:
+			if(SDL_BYTEORDER == SDL_BIG_ENDIAN)
+				return p[0] << 16 | p[1] << 8 | p[2];
+			else
+				return p[0] | p[1] << 8 | p[2] << 16;
+
+		case 4:
+			return *(Uint32 *)p;
+
+		default:
+			return 0;       /* shouldn't happen, but avoids warnings */
+	}
+}
+
 
 /* function to load in bitmap as a GL texture */
 int LoadGLTextures( const string & image_name )
@@ -108,12 +140,6 @@ int LoadGLTextures( const string & image_name )
 
 	/* Create storage space for the texture */
 	SDL_Surface *TextureImage[1]; 
-
-	if( !IMG_isJPG( SDL_RWFromFile( image_name.c_str(), "rb") ) )
-	{
-		cout << "image is not jpg" << endl;
-		return FALSE;
-	}
 
 	/* Load The image, Check For Errors, If image's Not Found Quit */
 	if ( ( TextureImage[0] = IMG_Load( image_name.c_str() ) ) )
@@ -127,33 +153,21 @@ int LoadGLTextures( const string & image_name )
 			return FALSE;
 		}
 
-		MyRGB buffer[1024][1024];
+		Uint32 buffer[1024][1024];
 
 		// HACK - pad image with black to fit in 1024x1024 texture
-		//
-		// FIXME - instead of using MyRGB I should use getpixel() and putpixel():
-		// http://docs.mandragor.org/files/Common_libs_documentation/SDL/SDL_Documentation_project_en/guidevideo.html#AEN90
-		// and then to extract the colors out of the Uint32:
-		// http://docs.mandragor.org/files/Common_libs_documentation/SDL/SDL_Documentation_project_en/sdlpixelformat.html
 		{
 			// set to black
-			memset( buffer, 0, 1024*1024*sizeof(MyRGB) );
+			memset( buffer, 0, 1024*1024*sizeof(Uint32) );
 
-			int i;
-			int offset;
-			for( i=0, offset=0; i<TextureImage[0]->h; i++)
+			for( int x=0; x<TextureImage[0]->w; ++x)
 			{
-				memcpy( buffer[i], (void*)&((MyRGB*)TextureImage[0]->pixels)[offset], TextureImage[0]->w * sizeof(MyRGB) );
-
-				offset += TextureImage[0]->w;
+				for( int y=0; y<TextureImage[0]->h; ++y )
+				{
+					buffer[y][x] = getpixel( TextureImage[0], x, y );  // not sure why but we reverse x and y here
+				}
 			}
 		}
-		
-		/*
-		int offset = 1024;
-		const MyRGB & color = ((MyRGB *)TextureImage[0]->pixels)[offset];
-		fprintf( stdout, "color %u %u %u\n", color.r, color.g, color.b  );
-		*/
 
 		/* Set the status to true */
 		Status = TRUE;
@@ -167,10 +181,10 @@ int LoadGLTextures( const string & image_name )
 		/* Generate The Texture */
 
 		GLint level_of_detail;
-	   level_of_detail = 0; /* highest quality	*/
+		level_of_detail = 0; /* highest quality	*/
 
 		//glTexImage2D( GL_TEXTURE_2D, level_of_detail, GL_RGB, TextureImage[0]->w, TextureImage[0]->h, 0, GL_RGB, GL_UNSIGNED_BYTE, TextureImage[0]->pixels );
-		glTexImage2D( GL_TEXTURE_2D, level_of_detail, GL_RGB, 1024, 1024, 0, GL_RGB, GL_UNSIGNED_BYTE, buffer );
+		glTexImage2D( GL_TEXTURE_2D, level_of_detail, GL_RGBA, 1024, 1024, 0, GL_RGBA, GL_UNSIGNED_BYTE, buffer );
 
 		/* Linear Filtering */
 		// change GL_LINEAR to GL_NEAREST to make faster, but looks kinda ugly when image is stretch in fullscreen
@@ -247,7 +261,7 @@ void draw_next_image( bool forward = true )
 				cout << "no more images" << endl;
 				return;
 			}
-			
+
 			--it;
 			g_texture = *it;;
 		}
@@ -334,7 +348,7 @@ void handleKeyPress( SDL_keysym *keysym )
 			draw_next_image(false);
 
 			// TODO
-			
+
 			break;
 		default:
 			break;
@@ -396,8 +410,8 @@ int drawGLScene( GLvoid )
 	glTranslatef( 0.0f, 0.0f, -2.5f );
 
 #ifdef SPIN
-//	glRotatef( xrot, 1.0f, 0.0f, 0.0f); /* Rotate On The X Axis */
-//	glRotatef( yrot, 0.0f, 1.0f, 0.0f); /* Rotate On The Y Axis */
+	//	glRotatef( xrot, 1.0f, 0.0f, 0.0f); /* Rotate On The X Axis */
+	//	glRotatef( yrot, 0.0f, 1.0f, 0.0f); /* Rotate On The Y Axis */
 	glRotatef( zrot, 0.0f, 0.0f, 1.0f); /* Rotate On The Z Axis */
 #endif
 
@@ -538,7 +552,7 @@ int drawGLScene( GLvoid )
 	zrot += 0.4f; /* Z Axis Rotation */
 #endif
 
-//	fprintf( stdout, "done drawGLScene\n" );
+	//	fprintf( stdout, "done drawGLScene\n" );
 
 	return( TRUE );
 }
@@ -688,7 +702,7 @@ int main( int argc, char **argv )
 
 		/* draw the scene */
 		//if ( isActive )
-			drawGLScene( );
+		drawGLScene( );
 	}
 
 	/* clean ourselves up and exit */
