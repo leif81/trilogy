@@ -2,3 +2,4 @@
 - support various sized images better (i.e. ones bigger then 1024x1024)
 - move image loading and displaying code into own class
 - merge code for opening directories and using xdg-utils to play media
+- sort order of files by name
