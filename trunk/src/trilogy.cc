@@ -245,13 +245,12 @@ void draw_next_image( bool forward = true )
 	{
 		if( forward )
 		{
-			if( it == g_files.end() )
+			if( it == g_files.end() || ++it == g_files.end() )
 			{
 				cout << "no more images" << endl;
 				return;
 			}
 
-			++it;
 			g_texture = *it;
 		}
 		else // backwards
@@ -260,6 +259,11 @@ void draw_next_image( bool forward = true )
 			{
 				cout << "no more images" << endl;
 				return;
+			}
+
+			if( it == g_files.end() )
+			{
+				--it;
 			}
 
 			--it;
