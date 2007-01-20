@@ -223,21 +223,36 @@ int resizeWindow( int width, int height )
 	return( TRUE );
 }
 
-void draw_next_image()
+void draw_next_image( bool forward = true )
 {
-	static vector<string>::const_iterator it = g_files.begin();
+	static vector<string>::const_iterator it = --g_files.begin(); // HAC go back one because on first seek we go fwd one, this fixes the annoying next/prev algorithm below
 
 	while(1)
 	{
-		if( it == g_files.end() )
+		if( forward )
 		{
-			cout << "no more images" << endl;
-			return;
+			if( it == g_files.end() )
+			{
+				cout << "no more images" << endl;
+				return;
+			}
+
+			++it;
+			g_texture = *it;
+		}
+		else // backwards
+		{
+			if( it == g_files.begin() )
+			{
+				cout << "no more images" << endl;
+				return;
+			}
+			
+			--it;
+			g_texture = *it;;
 		}
 
-		g_texture = *it;;
 		cout << "drawing " << g_texture << endl;
-		++it;
 
 		if ( !LoadGLTextures( g_texture ) )
 		{
@@ -315,6 +330,8 @@ void handleKeyPress( SDL_keysym *keysym )
 
 			break;
 		case SDLK_LEFT:
+
+			draw_next_image(false);
 
 			// TODO
 			
