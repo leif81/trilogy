@@ -351,8 +351,6 @@ void handleKeyPress( SDL_keysym *keysym )
 
 			draw_next_image(false);
 
-			// TODO
-
 			break;
 		default:
 			break;
