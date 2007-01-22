@@ -2,3 +2,4 @@
 - support various sized images better (i.e. ones bigger then 1024x1024)
 - move image loading and displaying code into own class
 - merge code for using xdg-utils to play media
+- press key to jump to movie name (i.e. 't' jumps to taladegga nights)
