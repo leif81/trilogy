@@ -18,6 +18,8 @@ void open_file( const string & file )
 	}
 }
 
+#ifdef TEST_OPEN_FILE
+
 int main( int argc, char ** argv )
 {
 	if( argc < 2 )
@@ -38,3 +40,5 @@ int main( int argc, char ** argv )
 
 	return 0;
 }
+
+#endif
