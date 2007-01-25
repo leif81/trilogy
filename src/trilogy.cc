@@ -1,13 +1,7 @@
 /*
- * This code was created by Jeff Molofee '99 
- * (ported to Linux/SDL by Ti Leggett '01)
+ * Trilogy
  *
- * If you've found this code useful, please let me know.
- *
- * Visit Jeff at http://nehe.gamedev.net/
- * 
- * or for port-specific comments, questions, bugreports etc. 
- * email to leggett@eecs.tulane.edu
+ * @author Leif Gruenwoldt
  */
 
 #include <stdio.h>
