@@ -1,0 +1,10 @@
+<trilogy>
+	<media>
+		<uri>/blah/blah.avi</uri>
+		<cover>cover.jpg</cover>
+	</media>
+	<media>
+		<uri>/blah/blah.avi</uri>
+		<cover>cover.jpg</cover>
+	</media>
+</trilogy>
