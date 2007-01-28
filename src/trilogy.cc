@@ -1,6 +1,8 @@
 /*
  * Trilogy
  *
+ * A movie browser for large displays
+ *
  * @author Leif Gruenwoldt
  */
 
@@ -54,8 +56,10 @@ GLuint texture[1]; /* Storage For One Texture ( NEW ) */
 int g_img_width = 0;
 int g_img_height = 0;
 
+string g_default_icon = "../share/video-x-generic.svg";
+
 vector<string> g_files; // name of all possible movie covers to cycle through
-string g_texture; // name of current texture to be drawn
+vector<string>::const_iterator g_it;
 
 // TODO there should be a struct like this defined somewhere in SDL, SDL_Color is close but contains alpha too
 typedef struct
@@ -273,59 +277,65 @@ int resizeWindow( int width, int height )
 	return( TRUE );
 }
 
-void draw_next_image( bool forward = true )
-{
-	static vector<string>::const_iterator it = --g_files.begin(); // HACK go back one because on first seek we go fwd one, this fixes the annoying next/prev algorithm below
 
-	while(1)
+string get_next_file()
+{
+	if( ++g_it == g_files.end() )
+	{
+		--g_it;
+		throw string("reached end, no more files");
+	}
+
+	return *g_it;
+}
+
+
+string get_prev_file()
+{
+	if( g_it == g_files.begin() )
+	{
+		throw string("reached beginning, no more files");
+	}
+
+	--g_it;
+	return *g_it;
+}
+
+void draw_next( bool forward = true )
+{
+	string media_filename;
+
+	try
 	{
 		if( forward )
 		{
-			if( ++it == g_files.end() )
-			{
-				--it;
-				cout << "reached end, no more images" << endl;
-				return;
-			}
-
-			g_texture = *it;
+			media_filename = get_next_file();
 		}
 		else // backwards
 		{
-			if( it == g_files.begin() )
-			{
-				cout << "reached beginning, no more images" << endl;
-				return;
-			}
-
-			--it;
-			g_texture = *it;;
+			media_filename = get_prev_file();
 		}
 
-		cout << "drawing " << g_texture << endl;
+		cout << "Showing " << media_filename << endl;
 
-#ifdef LOAD_IMAGES
-		if ( !LoadGLTextures( g_texture ) )
+#ifdef USE_CUSTOM_IMAGES
+		// TODO connect media_filename to custom image filename somehow, trilogy.xml?
+
+		string custom_image = lookup_custom_image("Die Hard");
+
+		if ( !LoadGLTextures( custom_image ) )
 		{
-			cout << "problem loading texture " << g_texture << endl;
-		}
-		else
-		{
-			break;
+			cout << "Problem loading custom image " << custom_image << endl;
 		}
 #endif
 
-		try
-		{
-			load_svg_gl_texture( g_texture );
-			break;
-		}
-		catch( const string err )
-		{ 
-			cout << "error loading svg " << g_texture << ":" << err << endl;
-		}
-	}
+		// TODO draw media file name on screen with pango/cairo?
 
+	}
+	catch( const string err )
+	{ 
+		cout << "Error while handling " << media_filename << ":" << err << endl;
+	}
 }
 
 /* function to handle key press events */
@@ -388,12 +398,12 @@ void handleKeyPress( SDL_keysym *keysym )
 			break;
 		case SDLK_RIGHT:
 
-			draw_next_image();
+			draw_next();
 
 			break;
 		case SDLK_LEFT:
 
-			draw_next_image(false);
+			draw_next(false);
 
 			break;
 		default:
@@ -606,8 +616,12 @@ void init( const string & path )
 	// c'mon, do it!
 	try
 	{
+		// load the default video icon
+		load_svg_gl_texture( g_default_icon );
+
 		g_files = get_files( path );
-		draw_next_image();
+		g_it = --g_files.begin(); // HACK go back one because on first seek we go fwd one, this fixes the annoying next/prev algorithm below
+		draw_next();
 	}
 	catch( const string & err )
 	{
