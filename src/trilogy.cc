@@ -11,6 +11,9 @@
 #include "SDL.h"
 #include <SDL/SDL_image.h>
 
+#include <librsvg/rsvg.h>
+#include <gdk-pixbuf/gdk-pixbuf-core.h>
+
 #include <math.h>
 #include <string.h> // for memcpy
 
@@ -29,10 +32,6 @@ using namespace std;
 #define FULL_SCREEN_WIDTH 1680
 #define FULL_SCREEN_HEIGHT 1050
 
-
-/* Set up some booleans */
-#define TRUE  1
-#define FALSE 0
 
 #define SQR(A)                (A * A)
 #define NORMALIZE3(A)          {double l=1.0/sqrt( SQR(A.x) + SQR(A.y) + SQR(A.z) ); A.x*=l; A.y*=l; A.z*=l;}
@@ -89,6 +88,8 @@ void Quit( int returnCode )
 	/* clean up the window */
 	SDL_Quit( );
 
+	rsvg_term ();
+
 	/* and exit appropriately */
 	exit( returnCode );
 }
@@ -123,6 +124,47 @@ Uint32 getpixel(SDL_Surface *surface, int x, int y)
 		default:
 			return 0;       /* shouldn't happen, but avoids warnings */
 	}
+}
+
+
+void load_svg_gl_texture( const string & svg_file )
+{
+	static bool first_time = true;
+
+	if( first_time )
+	{
+		rsvg_init ();
+		first_time = false;
+	}
+
+	GError * error = NULL;
+	GdkPixbuf * buf = rsvg_pixbuf_from_file_at_size ( svg_file.c_str(), 1024, 1024, &error );
+	if( !buf )
+	{
+		throw string(error->message);
+	}
+
+	g_img_width = gdk_pixbuf_get_width( buf );
+	g_img_height = gdk_pixbuf_get_height( buf );
+
+	cout << "number of channels: " << gdk_pixbuf_get_n_channels( buf ) << endl;
+	cout << "alpha channel: " << gdk_pixbuf_get_has_alpha( buf ) << endl;
+	cout << "bits per sample: " << gdk_pixbuf_get_bits_per_sample( buf ) << endl;
+	cout << "width: " << g_img_width << endl;
+	cout << "height: " << g_img_height << endl;
+
+	/* Create The Texture */
+	glGenTextures( 1, &texture[0] );
+
+	/* Typical Texture Generation Using Data From The Bitmap */
+	glBindTexture( GL_TEXTURE_2D, texture[0] );
+
+	/* Generate The Texture */
+	glTexImage2D( GL_TEXTURE_2D, 0, GL_RGBA, g_img_width, g_img_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, gdk_pixbuf_get_pixels( buf ) );
+
+	/* Linear Filtering */
+	glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR );
+	glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR );
 }
 
 
@@ -233,15 +275,16 @@ int resizeWindow( int width, int height )
 
 void draw_next_image( bool forward = true )
 {
-	static vector<string>::const_iterator it = --g_files.begin(); // HAC go back one because on first seek we go fwd one, this fixes the annoying next/prev algorithm below
+	static vector<string>::const_iterator it = --g_files.begin(); // HACK go back one because on first seek we go fwd one, this fixes the annoying next/prev algorithm below
 
 	while(1)
 	{
 		if( forward )
 		{
-			if( it == g_files.end() || ++it == g_files.end() )
+			if( ++it == g_files.end() )
 			{
-				cout << "no more images" << endl;
+				--it;
+				cout << "reached end, no more images" << endl;
 				return;
 			}
 
@@ -251,13 +294,8 @@ void draw_next_image( bool forward = true )
 		{
 			if( it == g_files.begin() )
 			{
-				cout << "no more images" << endl;
+				cout << "reached beginning, no more images" << endl;
 				return;
-			}
-
-			if( it == g_files.end() )
-			{
-				--it;
 			}
 
 			--it;
@@ -266,6 +304,7 @@ void draw_next_image( bool forward = true )
 
 		cout << "drawing " << g_texture << endl;
 
+#ifdef LOAD_IMAGES
 		if ( !LoadGLTextures( g_texture ) )
 		{
 			cout << "problem loading texture " << g_texture << endl;
@@ -273,6 +312,17 @@ void draw_next_image( bool forward = true )
 		else
 		{
 			break;
+		}
+#endif
+
+		try
+		{
+			load_svg_gl_texture( g_texture );
+			break;
+		}
+		catch( const string err )
+		{ 
+			cout << "error loading svg " << g_texture << ":" << err << endl;
 		}
 	}
 
@@ -360,10 +410,6 @@ int initGL( GLvoid )
 	printf ("OpenGL vendor: %s\n", glGetString (GL_VENDOR));
 	printf ("OpenGL renderer: %s\n", glGetString (GL_RENDERER));
 
-	/* Load in the texture */
-	if ( !LoadGLTextures( g_texture ) )
-		return FALSE;
-
 	/* Enable Texture Mapping ( NEW ) */
 	glEnable( GL_TEXTURE_2D );
 
@@ -406,8 +452,8 @@ int drawGLScene( GLvoid )
 	glTranslatef( 0.0f, 0.0f, -2.5f );
 
 #ifdef SPIN
-	//	glRotatef( xrot, 1.0f, 0.0f, 0.0f); /* Rotate On The X Axis */
-	//	glRotatef( yrot, 0.0f, 1.0f, 0.0f); /* Rotate On The Y Axis */
+	glRotatef( xrot, 1.0f, 0.0f, 0.0f); /* Rotate On The X Axis */
+	glRotatef( yrot, 0.0f, 1.0f, 0.0f); /* Rotate On The Y Axis */
 	glRotatef( zrot, 0.0f, 0.0f, 1.0f); /* Rotate On The Z Axis */
 #endif
 
@@ -592,6 +638,8 @@ int main( int argc, char **argv )
 		fprintf( stderr, "Video initialization failed: %s\n", SDL_GetError( ) );
 		Quit( 1 );
 	}
+
+	SDL_WM_SetCaption("trilogy", NULL ); // null icon
 
 	char video_driver[32];
 
