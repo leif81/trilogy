@@ -54,7 +54,7 @@ int main (int argc, char *argv[])
 		clutter_box_set_default_padding ( CLUTTER_BOX (vbox_right), 10, 10, 10, 10 );
 
 		GdkPixbuf       *pixbuf;
-		pixbuf = gdk_pixbuf_new_from_file ("cover.jpg", NULL);
+		pixbuf = gdk_pixbuf_new_from_file ("../share/dawn_of_the_dead_ver2.jpg", NULL);
 		actor  = clutter_texture_new_from_pixbuf (pixbuf);
 		clutter_actor_set_position (actor, 0, 0);
 		clutter_actor_show ( actor );
