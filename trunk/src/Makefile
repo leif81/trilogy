@@ -2,10 +2,10 @@ SRC=clutter-layout.c
 
 
 build:
-	 gcc `PKG_CONFIG_PATH=/usr/local/lib/pkgconfig/ pkg-config --libs --cflags clutter-0.4` $(SRC)
+	 gcc `PKG_CONFIG_PATH=/usr/local/lib/pkgconfig/ pkg-config --libs --cflags clutter-0.4` $(SRC) -o trilogy
 
 run: build
-	./a.out
+	./trilogy
 
 edit:
 	vim $(SRC)
