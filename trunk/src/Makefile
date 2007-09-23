@@ -1,4 +1,4 @@
-SRC=clutter-layout.c
+SRC=trilogy.c
 
 
 build:
