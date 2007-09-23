@@ -19,7 +19,7 @@ void input_cb (ClutterStage *stage, ClutterEvent *event, gpointer data)
 
 		if (e)
 		{
-			clutter_actor_hide (e);
+//			clutter_actor_hide (e);
 		}
 
 	}
