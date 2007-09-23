@@ -1,4 +1,5 @@
 #include <clutter/clutter.h>
+#include <glib.h>
 
 /* input handler */
 void input_cb (ClutterStage *stage, ClutterEvent *event, gpointer data)
@@ -25,14 +26,30 @@ void input_cb (ClutterStage *stage, ClutterEvent *event, gpointer data)
 	}
 	else if (event->type == CLUTTER_KEY_RELEASE)
 	{
+		static gint fullscreen = TRUE;
+
 		ClutterKeyEvent *kev = (ClutterKeyEvent *) event;
 
 		g_print ("*** key press event (key:%c) ***\n",
 				clutter_key_event_symbol (kev));
 
-		if (clutter_key_event_symbol (kev) == CLUTTER_q)
+		switch (clutter_key_event_symbol (kev))
 		{
-			clutter_main_quit ();
+			case CLUTTER_q:
+				clutter_main_quit ();
+				break;
+			
+			case CLUTTER_f:
+				if( fullscreen )
+				{
+					clutter_stage_unfullscreen( CLUTTER_STAGE (data) );
+				}
+				else
+				{
+					clutter_stage_fullscreen( CLUTTER_STAGE (data) );
+				}
+				fullscreen != fullscreen; 
+				break;
 		}
 	}
 }
@@ -112,8 +129,8 @@ int main (int argc, char *argv[])
 
 	clutter_actor_show_all (stage);
 
-	g_signal_connect (stage, "button-press-event", G_CALLBACK (input_cb), NULL);
-	g_signal_connect (stage, "key-release-event", G_CALLBACK (input_cb), NULL);
+	g_signal_connect (stage, "button-press-event", G_CALLBACK (input_cb), stage);
+	g_signal_connect (stage, "key-release-event", G_CALLBACK (input_cb), stage);
 
 
 	clutter_main();
