@@ -1,5 +1,43 @@
 #include <clutter/clutter.h>
 
+/* input handler */
+void input_cb (ClutterStage *stage, ClutterEvent *event, gpointer data)
+{
+	if (event->type == CLUTTER_BUTTON_PRESS)
+	{
+		ClutterButtonEvent *button_event;
+		ClutterActor *e;
+		gint x, y;
+
+		clutter_event_get_coords (event, &x, &y);
+
+		button_event = (ClutterButtonEvent *) event;
+		g_print ("*** button press event (button:%d) ***\n",
+				button_event->button);
+
+		e = clutter_stage_get_actor_at_pos (stage, x, y);
+
+		if (e)
+		{
+			clutter_actor_hide (e);
+		}
+
+	}
+	else if (event->type == CLUTTER_KEY_RELEASE)
+	{
+		ClutterKeyEvent *kev = (ClutterKeyEvent *) event;
+
+		g_print ("*** key press event (key:%c) ***\n",
+				clutter_key_event_symbol (kev));
+
+		if (clutter_key_event_symbol (kev) == CLUTTER_q)
+		{
+			clutter_main_quit ();
+		}
+	}
+}
+
+
 
 ClutterActor * create_title( const gchar * title )
 {
@@ -55,10 +93,17 @@ int main (int argc, char *argv[])
 
 		GdkPixbuf       *pixbuf;
 		pixbuf = gdk_pixbuf_new_from_file ("../share/dawn_of_the_dead_ver2.jpg", NULL);
-		actor  = clutter_texture_new_from_pixbuf (pixbuf);
-		clutter_actor_set_position (actor, 0, 0);
-		clutter_actor_show ( actor );
-		clutter_container_add_actor ( CLUTTER_CONTAINER (vbox_right), actor );
+		if (!pixbuf)
+		{
+			g_error("pixbuf load failed");
+		}
+		else
+		{
+			actor  = clutter_texture_new_from_pixbuf (pixbuf);
+			clutter_actor_set_position (actor, 0, 0);
+			clutter_actor_show ( actor );
+			clutter_container_add_actor ( CLUTTER_CONTAINER (vbox_right), actor );
+		}
 
 		clutter_actor_show ( vbox_right );
 		clutter_box_pack_defaults ( CLUTTER_BOX (hbox), vbox_right );
@@ -66,6 +111,10 @@ int main (int argc, char *argv[])
 
 
 	clutter_actor_show_all (stage);
+
+	g_signal_connect (stage, "button-press-event", G_CALLBACK (input_cb), NULL);
+	g_signal_connect (stage, "key-release-event", G_CALLBACK (input_cb), NULL);
+
 
 	clutter_main();
 
