@@ -1,8 +1,8 @@
-SRC=trilogy.c
+SRC=trilogy.c MediaLoader.cc MediaItem.cc
 
 
 build:
-	 gcc `PKG_CONFIG_PATH=/usr/local/lib/pkgconfig/ pkg-config --libs --cflags clutter-0.4` $(SRC) -o trilogy
+	 g++ `PKG_CONFIG_PATH=/usr/local/lib/pkgconfig/ pkg-config --libs --cflags clutter-0.4` $(SRC) -o trilogy
 
 run: build
 	./trilogy
