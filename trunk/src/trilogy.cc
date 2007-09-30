@@ -59,12 +59,10 @@ void adjust_selection( App * app, int step )
          "opacity-start", 0x66,
          "opacity-end", 0xff,
          NULL);
-     g_object_set (item->scale_behave,
-         "scale-begin", 0.6,
-         "scale-end", 1.0,
-         NULL);
    }
 */
+
+	int prev_selected = app->selected_item;
 
 	app->selected_item += step;
 	if( app->selected_item < 0 )
@@ -76,11 +74,14 @@ void adjust_selection( App * app, int step )
 		app->selected_item = app->items.size() - 1;
 	}
 
+
+
 	ClutterKnot knot[2];
 	
 	for( int i=0; i < app->labels.size(); ++i )
 	{
-		ClutterActor * actor = app->labels[i]->actor;
+		LabelItem * label = app->labels[i];
+		ClutterActor * actor = label->actor;
 
 		if( i == app->selected_item )
 		{
@@ -98,10 +99,27 @@ void adjust_selection( App * app, int step )
 			}
 
 			clutter_label_set_color( CLUTTER_LABEL( actor ), &highlight_color );	
+
+			g_object_set (label->scale_behave,
+				"scale-begin", 1.0,
+				"scale-end", 1.1,
+				NULL);
+		}
+		else if( i == prev_selected )
+		{
+			clutter_label_set_color( CLUTTER_LABEL(actor), &normal_color );	
+
+			g_object_set (label->scale_behave,
+				"scale-begin", 1.1,
+				"scale-end", 1.0,
+				NULL);
 		}
 		else
 		{
-			clutter_label_set_color( CLUTTER_LABEL(actor), &normal_color );	
+			g_object_set (label->scale_behave,
+				"scale-begin", 1.0,
+				"scale-end", 1.0,
+				NULL);
 		}
 
 		// TODO shift the list when we get near the bottom or top
@@ -121,7 +139,7 @@ void adjust_selection( App * app, int step )
 	}
 		
 
-	//	clutter_timeline_start (app->timeline);
+	clutter_timeline_start (app->timeline);
 }
 
 
@@ -205,9 +223,13 @@ void input_cb (ClutterStage *stage, ClutterEvent *event, gpointer data)
 
 			case CLUTTER_Page_Up:
 
+				adjust_selection( app, -5 );
+
 				break;
 
 			case CLUTTER_Page_Down:
+
+				adjust_selection( app, 5 );
 
 				break;
 
@@ -242,21 +264,6 @@ on_timeline_new_frame (ClutterTimeline *timeline, gint frame_num, App *app)
 }
 
 
-
-LabelItem * create_label( const gchar * title )
-{
-	LabelItem * item = g_new0(LabelItem, 1);
-
-	item->actor = clutter_label_new_with_text ( "Sans Bold 24", title );
-	clutter_label_set_color ( CLUTTER_LABEL (item->actor), &normal_color );
-	clutter_actor_show ( item->actor );
-
-	return item;
-}
-
-
-
-
 int main (int argc, char *argv[])
 {
 	App	*app;
@@ -278,8 +285,10 @@ int main (int argc, char *argv[])
 			app->timeline, CLUTTER_ALPHA_SINE_HALF, NULL, NULL);
 	app->items = MediaLoader("/home/leif/Pictures/images/covers/movies").getMediaItems();
 	app->selected_item = 0;
-	app->effect_template
-		 = clutter_effect_template_new ( app->timeline, CLUTTER_ALPHA_RAMP_INC);
+	app->effect_template = clutter_effect_template_new ( 
+			app->timeline, CLUTTER_ALPHA_RAMP_INC);
+	app->alpha_sine_inc = clutter_alpha_new_full (
+			app->timeline, CLUTTER_ALPHA_SINE_INC, NULL, NULL);
 
 	hbox = clutter_hbox_new ();
 	clutter_actor_set_position( hbox, 0, 0 );
@@ -298,9 +307,18 @@ int main (int argc, char *argv[])
 		{
 			const MediaItem item = *it;
 
-			LabelItem * label = create_label ( item.getName().c_str() );
-			app->labels.push_back(label);
+			LabelItem * label = g_new0(LabelItem, 1);
+			label->actor = clutter_label_new_with_text ( "Sans Bold 24", item.getName().c_str() );
+			clutter_label_set_color ( CLUTTER_LABEL (label->actor), &normal_color );
+			clutter_actor_show ( label->actor );
+			label->scale_behave = clutter_behaviour_scale_new ( 
+				app->alpha_sine_inc,
+				1.0, 1.0,
+				CLUTTER_GRAVITY_CENTER);
+			clutter_behaviour_apply (label->scale_behave, label->actor);
+
 			clutter_box_pack_defaults ( CLUTTER_BOX (app->vbox_left), label->actor );
+			app->labels.push_back(label);
 		}
 
 		clutter_actor_show ( app->vbox_left );
