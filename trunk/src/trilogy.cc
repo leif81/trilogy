@@ -52,16 +52,6 @@ ClutterColor normal_color = { 255, 255, 255, 255 };
 
 void adjust_selection( App * app, int step )
 {
-/*
-	if (i == app->selected_index)
-   {
-     g_object_set (item->opacity_behave,
-         "opacity-start", 0x66,
-         "opacity-end", 0xff,
-         NULL);
-   }
-*/
-
 	int prev_selected = app->selected_item;
 
 	app->selected_item += step;
@@ -75,8 +65,7 @@ void adjust_selection( App * app, int step )
 	}
 
 
-
-	ClutterKnot knot[2];
+	// ClutterKnot knot[2];
 	
 	for( int i=0; i < app->labels.size(); ++i )
 	{
@@ -102,7 +91,7 @@ void adjust_selection( App * app, int step )
 
 			g_object_set (label->scale_behave,
 				"scale-begin", 1.0,
-				"scale-end", 1.1,
+				"scale-end", 1.2,
 				NULL);
 		}
 		else if( i == prev_selected )
@@ -110,7 +99,7 @@ void adjust_selection( App * app, int step )
 			clutter_label_set_color( CLUTTER_LABEL(actor), &normal_color );	
 
 			g_object_set (label->scale_behave,
-				"scale-begin", 1.1,
+				"scale-begin", 1.2,
 				"scale-end", 1.0,
 				NULL);
 		}
@@ -138,7 +127,6 @@ void adjust_selection( App * app, int step )
 		*/
 	}
 		
-
 	clutter_timeline_start (app->timeline);
 }
 
@@ -186,8 +174,7 @@ void input_cb (ClutterStage *stage, ClutterEvent *event, gpointer data)
 
 		ClutterKeyEvent *kev = (ClutterKeyEvent *) event;
 
-		g_print ("*** key press event (key:%c) ***\n",
-				clutter_key_event_symbol (kev));
+		// g_print ("*** key press event (key:%c) ***\n", clutter_key_event_symbol (kev));
 
 		switch (clutter_key_event_symbol (kev))
 		{
@@ -259,7 +246,7 @@ on_timeline_new_frame (ClutterTimeline *timeline, gint frame_num, App *app)
 
 	if (frame_num == clutter_timeline_get_n_frames (timeline)/2)
 	{
-		printf("half way\n");
+		// printf("half way\n");
 	}
 }
 
@@ -300,7 +287,7 @@ int main (int argc, char *argv[])
 	// Setup the list of movie titles
 	{
 		app->vbox_left = clutter_vbox_new ();
-		clutter_box_set_default_padding ( CLUTTER_BOX (app->vbox_left), 10, 10, 10, 10 );
+		clutter_box_set_default_padding ( CLUTTER_BOX (app->vbox_left), 10, 10, 10, 50 );
 
 		vector<MediaItem>::const_iterator it = app->items.begin();
 		for( ; it < app->items.end(); ++it )
