@@ -12,10 +12,13 @@
 #include <string.h>
 #include <errno.h>
 
+#include <libgen.h> // for basename
+
 #include <vector>
 #include <iostream>
 
-#include "list_files.h"
+#include "MediaLoader.h"
+#include "MediaItem.h"
 
 #include <algorithm>
 
@@ -24,39 +27,42 @@
 
 using namespace std;
 
-struct lowercase : public unary_function<char, void> 
+namespace 
 {
-	void operator() (char & c) 
+	struct lowercase : public unary_function<char, void> 
 	{
-		c = tolower(c);
+		void operator() (char & c) 
+		{
+			c = tolower(c);
+		}
+	};
+
+	bool string_cmp( string a, string b )
+	{
+		for_each( a.begin(), a.begin() + a.length(), lowercase() ); 	
+		for_each( b.begin(), b.begin() + b.length(), lowercase() ); 	
+
+		return a < b;
 	}
-};
 
-bool string_cmp( string a, string b )
-{
-	for_each( a.begin(), a.begin() + a.length(), lowercase() ); 	
-	for_each( b.begin(), b.begin() + b.length(), lowercase() ); 	
+	bool isdirectory( const string & path) 
+	{
+		struct stat statbuf;
 
-	return a < b;
+		if( stat( path.c_str(), &statbuf) == -1)
+		{
+			return false;
+		}
+		else
+		{
+			return S_ISDIR(statbuf.st_mode);
+		}
+	}
 }
 
-bool isdirectory( const string & path) 
+
+MediaLoader::MediaLoader( const string & dir_path, bool recursive )
 {
-	struct stat statbuf;
-
-	if( stat( path.c_str(), &statbuf) == -1)
-	{
-		return false;
-	}
-	else
-	{
-		return S_ISDIR(statbuf.st_mode);
-	}
-}
-
-vector<string> get_files( const string & dir_path )
-{
-
 	DIR * dip = opendir( dir_path.c_str() );
 	if( dip == NULL )
 	{
@@ -67,6 +73,7 @@ vector<string> get_files( const string & dir_path )
 	vector<string> files;
 	struct dirent *	dit;
 
+	// TODO allow for recursive search
 	for( int i=0; (dit = readdir(dip) ) != NULL; ++i )
 	{
 		// check if it's a file or directory
@@ -74,6 +81,7 @@ vector<string> get_files( const string & dir_path )
 
 		if( !isdirectory(name) )
 		{
+			// TODO check the mime type to make sure it's a video file
 			files.push_back( dir_path + "/" + name );	
 		}
 	}
@@ -85,9 +93,29 @@ vector<string> get_files( const string & dir_path )
 	}
 
 	sort( files.begin(), files.end(), string_cmp );
+
+	vector<string>::const_iterator it = files.begin();
+	for( ; it < files.end(); ++it )
+	{
+		const string file_path = *it;
+		
+		char * path_copy = strdup( file_path.c_str() );
+		char * name = basename( path_copy );
+
+		m_mediaItems.push_back( MediaItem( name, file_path, file_path ) );
+
+		free(path_copy);
+	}
 	
-	return files; // return a copy, meh who cares
 }
+
+vector<MediaItem> MediaLoader::getMediaItems() const
+{
+	return m_mediaItems; // return a copy, meh who cares for now
+}
+
+
+
 
 #ifdef TEST_LIST_FILES
 
@@ -99,12 +127,13 @@ int main( int argc, char ** argv)
 		return -1;
 	}
 
-	vector<string> files = get_files( argv[1] );
+	vector<MediaItem> files = MediaLoader( argv[1] ).getMediaItems();
 
-	vector<string>::const_iterator it = files.begin();
+	vector<MediaItem>::const_iterator it = files.begin();
 	for( ; it < files.end(); ++it )
 	{
-		cout << *it << endl;
+		const MediaItem item = *it;
+		cout << item.getFilePath() << endl;
 	}
 
 	return 0;
