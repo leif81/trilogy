@@ -22,6 +22,8 @@
 #include "MediaLoader.h"
 #include "MediaItem.h"
 
+#include <iostream>
+
 using namespace std;
 
 typedef struct LabelItem
@@ -47,8 +49,8 @@ typedef struct App
 
 
 
-ClutterColor highlight_color = { 255, 0, 0, 255 };
-ClutterColor normal_color = { 255, 255, 255, 255 };
+ClutterColor highlight_color = { 255, 255, 0, 255 };
+ClutterColor normal_color = { 255, 255, 255, 155 };
 
 void adjust_selection( App * app, int step )
 {
@@ -80,12 +82,13 @@ void adjust_selection( App * app, int step )
 			pixbuf = gdk_pixbuf_new_from_file ( item.getCoverPath().c_str(), NULL);
 			if (!pixbuf)
 			{
-				g_error("pixbuf load failed '%s'", item.getCoverPath().c_str());
+				//g_error("pixbuf load failed '%s'", item.getCoverPath().c_str());
+
+				// Just create a 1x1 transparent pixbuf and draw that 
+				pixbuf = gdk_pixbuf_new ( GDK_COLORSPACE_RGB, 1, 8, 1, 1);
 			}
-			else
-			{
-				clutter_texture_set_pixbuf( CLUTTER_TEXTURE (app->cover), pixbuf, NULL);
-			}
+
+			clutter_texture_set_pixbuf( CLUTTER_TEXTURE (app->cover), pixbuf, NULL);
 
 			clutter_label_set_color( CLUTTER_LABEL( actor ), &highlight_color );	
 
@@ -131,14 +134,63 @@ void adjust_selection( App * app, int step )
 }
 
 
+void loadMediaDir( const string & dir, App * app )
+{
+	try
+	{
+		app->labels.clear();
+
+		app->items = MediaLoader(dir).getMediaItems();
+
+		clutter_box_remove_all( CLUTTER_BOX (app->vbox_left ) );
+
+		vector<MediaItem>::const_iterator it = app->items.begin();
+		for( ; it < app->items.end(); ++it )
+		{
+			const MediaItem item = *it;
+
+			LabelItem * label = g_new0(LabelItem, 1);
+			label->actor = clutter_label_new_with_text ( "Sans Bold 24", item.getName().c_str() );
+			clutter_label_set_color ( CLUTTER_LABEL (label->actor), &normal_color );
+			clutter_actor_show ( label->actor );
+			label->scale_behave = clutter_behaviour_scale_new ( 
+				app->alpha_sine_inc,
+				1.0, 1.0,
+				CLUTTER_GRAVITY_CENTER);
+			clutter_behaviour_apply (label->scale_behave, label->actor);
+
+			clutter_box_pack_defaults ( CLUTTER_BOX (app->vbox_left), label->actor );
+			app->labels.push_back(label);
+		}
+	}
+	catch( const string & e )
+	{
+		cout << "Problem loading media:"	<< e << endl;
+		exit(1);
+	}
+
+	app->selected_item = 0;
+	adjust_selection( app, 0 );
+}
+
+
 void play_selection( App * app )
 {
+	
 	MediaItem media = app->items[app->selected_item];
-	const string cmd = "xdg-open " + media.getFilePath();
-   if( system( cmd.c_str() ) == - 1 )
-   {
-      throw string("can't open file");
-   }
+
+	if( MediaLoader::isdirectory( media.getFilePath() ) )
+	{
+		loadMediaDir( media.getFilePath(), app );
+	}
+	else
+	{
+		const string cmd = "xdg-open \"" + media.getFilePath() + "\"";
+		if( system( cmd.c_str() ) == - 1 )
+		{
+			throw string("can't open file");
+		}
+	}
 }
 
 
@@ -179,7 +231,7 @@ void input_cb (ClutterStage *stage, ClutterEvent *event, gpointer data)
 		switch (clutter_key_event_symbol (kev))
 		{
 			case CLUTTER_Escape:
-			case CLUTTER_q:
+			//case CLUTTER_q:
 				clutter_main_quit ();
 				break;
 
@@ -218,6 +270,12 @@ void input_cb (ClutterStage *stage, ClutterEvent *event, gpointer data)
 
 				adjust_selection( app, 5 );
 
+				break;
+
+			case CLUTTER_Left:
+
+				// TODO go up a directory
+				
 				break;
 
 			case CLUTTER_Home:
@@ -270,8 +328,8 @@ int main (int argc, char *argv[])
 	app->timeline = clutter_timeline_new ( 15, 90);
 	app->alpha_ramp = clutter_alpha_new_full (
 			app->timeline, CLUTTER_ALPHA_SINE_HALF, NULL, NULL);
-	app->items = MediaLoader("/home/leif/Pictures/images/covers/movies").getMediaItems();
-	app->selected_item = 0;
+
+
 	app->effect_template = clutter_effect_template_new ( 
 			app->timeline, CLUTTER_ALPHA_RAMP_INC);
 	app->alpha_sine_inc = clutter_alpha_new_full (
@@ -284,52 +342,27 @@ int main (int argc, char *argv[])
 	clutter_container_add_actor ( CLUTTER_CONTAINER (stage), hbox );
 
 
+
 	// Setup the list of movie titles
 	{
 		app->vbox_left = clutter_vbox_new ();
 		clutter_box_set_default_padding ( CLUTTER_BOX (app->vbox_left), 10, 10, 10, 50 );
 
-		vector<MediaItem>::const_iterator it = app->items.begin();
-		for( ; it < app->items.end(); ++it )
-		{
-			const MediaItem item = *it;
-
-			LabelItem * label = g_new0(LabelItem, 1);
-			label->actor = clutter_label_new_with_text ( "Sans Bold 24", item.getName().c_str() );
-			clutter_label_set_color ( CLUTTER_LABEL (label->actor), &normal_color );
-			clutter_actor_show ( label->actor );
-			label->scale_behave = clutter_behaviour_scale_new ( 
-				app->alpha_sine_inc,
-				1.0, 1.0,
-				CLUTTER_GRAVITY_CENTER);
-			clutter_behaviour_apply (label->scale_behave, label->actor);
-
-			clutter_box_pack_defaults ( CLUTTER_BOX (app->vbox_left), label->actor );
-			app->labels.push_back(label);
-		}
 
 		clutter_actor_show ( app->vbox_left );
 		clutter_box_pack_defaults ( CLUTTER_BOX (hbox), app->vbox_left );
 	}
 
+
 	// Show the movie cover for the selected movie title
 	{
 		ClutterActor *vbox_right;
-		GdkPixbuf       *pixbuf;
 
 		vbox_right = clutter_vbox_new ();
 		clutter_box_set_default_padding ( CLUTTER_BOX (vbox_right), 10, 10, 10, 10 );
-		MediaItem item = app->items[app->selected_item];
 
-		pixbuf = gdk_pixbuf_new_from_file ( item.getCoverPath().c_str(), NULL);
-		if (!pixbuf)
-		{
-			g_error("pixbuf load failed '%s'", item.getCoverPath().c_str() );
-		}
-		else
-		{
-			app->cover  = clutter_texture_new_from_pixbuf (pixbuf);
-		}
+		// setup dummy cover
+		app->cover  = clutter_texture_new_from_pixbuf (NULL);
 
 		clutter_actor_set_position ( app->cover, 0, 0);
 		clutter_actor_show ( app->cover );
@@ -340,7 +373,7 @@ int main (int argc, char *argv[])
 		clutter_box_pack_defaults ( CLUTTER_BOX (hbox), vbox_right );
 	}
 
-
+	loadMediaDir("/home/media/leif/Video/Movies", app);
 
 	g_signal_connect (stage, "button-press-event", G_CALLBACK (input_cb), app);
 	g_signal_connect (stage, "key-release-event", G_CALLBACK (input_cb), app);
@@ -351,8 +384,6 @@ int main (int argc, char *argv[])
 				app);
 
 	//clutter_timeline_start (app->timeline);
-
-	adjust_selection( app, 0 );
 
 	clutter_actor_show_all (stage);
 

@@ -44,20 +44,6 @@ namespace
 
 		return a < b;
 	}
-
-	bool isdirectory( const string & path) 
-	{
-		struct stat statbuf;
-
-		if( stat( path.c_str(), &statbuf) == -1)
-		{
-			return false;
-		}
-		else
-		{
-			return S_ISDIR(statbuf.st_mode);
-		}
-	}
 }
 
 
@@ -79,9 +65,8 @@ MediaLoader::MediaLoader( const string & dir_path, bool recursive )
 		// check if it's a file or directory
 		const string name = dit->d_name;
 
-		if( !isdirectory(name) )
+		//if( !isdirectory(name) )
 		{
-			// TODO check the mime type to make sure it's a video file
 			files.push_back( dir_path + "/" + name );	
 		}
 	}
@@ -102,7 +87,18 @@ MediaLoader::MediaLoader( const string & dir_path, bool recursive )
 		char * path_copy = strdup( file_path.c_str() );
 		char * name = basename( path_copy );
 
-		m_mediaItems.push_back( MediaItem( name, file_path, file_path ) );
+		if( isVideo( file_path ) )
+		{
+			m_mediaItems.push_back( MediaItem( name, "../share/video-x-generic.svg", file_path ) );
+		}
+		else if( isImage( file_path ) )
+		{
+			m_mediaItems.push_back( MediaItem( name, file_path, file_path ) );
+		}
+		else if( isdirectory( file_path ) )
+		{
+			m_mediaItems.push_back( MediaItem( string( name ) + "/" , "", file_path ) );
+		}
 
 		free(path_copy);
 	}
@@ -114,6 +110,48 @@ vector<MediaItem> MediaLoader::getMediaItems() const
 	return m_mediaItems; // return a copy, meh who cares for now
 }
 
+
+bool MediaLoader::isVideo( const string & path )
+{
+	// FIXME hacky hack until libgio is available
+	
+	string::size_type loc = path.find(".avi", 0);
+	if( loc != string::npos )
+	{
+		return true;
+	}
+
+	return false;
+}
+
+
+bool MediaLoader::isImage( const string & path )
+{
+	// FIXME hacky hack until libgio is available
+	
+	string::size_type loc = path.find(".png", 0);
+	if( loc != string::npos )
+	{
+		return true;
+	}
+
+	return false;
+}
+
+
+bool MediaLoader::isdirectory( const string & path) 
+{
+	struct stat statbuf;
+
+	if( stat( path.c_str(), &statbuf) == -1)
+	{
+		return false;
+	}
+	else
+	{
+		return S_ISDIR(statbuf.st_mode);
+	}
+}
 
 
 
