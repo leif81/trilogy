@@ -22,7 +22,12 @@ class MediaLoader
 
 		std::vector<MediaItem> getMediaItems() const;
 
+		static bool isdirectory( const std::string & path);
+
 	private:
+
+		bool isVideo( const std::string & path );
+		bool isImage( const std::string & path );
 
 		std::vector<MediaItem> m_mediaItems;
 };
