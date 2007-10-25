@@ -113,10 +113,9 @@ vector<MediaItem> MediaLoader::getMediaItems() const
 
 bool MediaLoader::isVideo( const string & path )
 {
-	// FIXME hacky hack until libgio is available
+	// FIXME hacky hack until libgio is available so I can look at mimetypes
 	
-	string::size_type loc = path.find(".avi", 0);
-	if( loc != string::npos )
+	if( hasExtension( path, ".avi" ) )
 	{
 		return true;
 	}
@@ -127,9 +126,29 @@ bool MediaLoader::isVideo( const string & path )
 
 bool MediaLoader::isImage( const string & path )
 {
-	// FIXME hacky hack until libgio is available
+	// FIXME hacky hack until libgio is available so I can look at mimetypes
 	
-	string::size_type loc = path.find(".png", 0);
+	vector<string> imageTypes;
+	imageTypes.push_back(".png");
+	imageTypes.push_back(".jpg");
+	imageTypes.push_back(".svg");
+
+	vector<string>::const_iterator it = imageTypes.begin();
+	for( ; it != imageTypes.end(); ++it )
+	{
+		const string extension = *it;
+		if( hasExtension( path, extension ) )
+		{
+			return true;
+		}
+	}
+	
+	return false;
+}
+
+bool MediaLoader::hasExtension( const string & filename, const string & extension ) const
+{
+	string::size_type loc = filename.find( extension, 0);
 	if( loc != string::npos )
 	{
 		return true;

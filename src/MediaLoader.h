@@ -29,6 +29,8 @@ class MediaLoader
 		bool isVideo( const std::string & path );
 		bool isImage( const std::string & path );
 
+		bool hasExtension( const std::string & filename, const std::string & extension ) const;
+
 		std::vector<MediaItem> m_mediaItems;
 };
 

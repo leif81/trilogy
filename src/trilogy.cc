@@ -311,6 +311,13 @@ on_timeline_new_frame (ClutterTimeline *timeline, gint frame_num, App *app)
 
 int main (int argc, char *argv[])
 {
+	string dir = ".";
+
+	if( argc > 1 )
+	{
+		dir = argv[1];	
+	}
+
 	App	*app;
 
 	ClutterActor    *stage, *hbox;
@@ -373,7 +380,7 @@ int main (int argc, char *argv[])
 		clutter_box_pack_defaults ( CLUTTER_BOX (hbox), vbox_right );
 	}
 
-	loadMediaDir("/home/media/leif/Video/Movies", app);
+	loadMediaDir( dir, app);
 
 	g_signal_connect (stage, "button-press-event", G_CALLBACK (input_cb), app);
 	g_signal_connect (stage, "key-release-event", G_CALLBACK (input_cb), app);
