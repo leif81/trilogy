@@ -18,6 +18,7 @@
 
 #include <clutter/clutter.h>
 #include <glib.h>
+#include <glib/gprintf.h>
 
 #include "MediaLoader.h"
 #include "MediaItem.h"
@@ -52,6 +53,35 @@ typedef struct App
 ClutterColor highlight_color = { 255, 255, 0, 255 };
 ClutterColor normal_color = { 255, 255, 255, 155 };
 
+// shift the list when we get near the bottom or top
+void shift_list( App * app, int step )
+{
+
+	ClutterKnot knot[2];
+
+	gint top_padding, bottom_padding;
+
+	clutter_box_get_default_padding( CLUTTER_BOX(app->vbox_left), &top_padding, NULL, &bottom_padding, NULL );
+
+	for( int i=0; i < app->labels.size(); ++i )
+	{
+		LabelItem * label = app->labels[i];
+		ClutterActor * actor = label->actor;
+
+		knot[0].x = clutter_actor_get_x(actor);
+		knot[0].y = clutter_actor_get_y(actor);
+		knot[1].x = clutter_actor_get_x(actor);
+		knot[1].y = clutter_actor_get_y(actor) - (clutter_actor_get_height(actor) + top_padding + bottom_padding) * step;
+
+		clutter_effect_move ( app->effect_template,
+			actor,
+			knot,
+			2,
+			NULL,
+			NULL);
+	}
+}
+
 void adjust_selection( App * app, int step )
 {
 	int prev_selected = app->selected_item;
@@ -66,8 +96,6 @@ void adjust_selection( App * app, int step )
 		app->selected_item = app->items.size() - 1;
 	}
 
-
-	// ClutterKnot knot[2];
 	
 	for( int i=0; i < app->labels.size(); ++i )
 	{
@@ -76,6 +104,28 @@ void adjust_selection( App * app, int step )
 
 		if( i == app->selected_item )
 		{
+			// check if we need to shift list to stay on screen
+			{
+				gint x,y;
+				clutter_actor_get_abs_position( actor, &x, &y );
+				const int margin = 10; // pixels from edge of screen that triggers shift
+
+				if( step > 0 )
+				{
+					if( y + clutter_actor_get_height(actor) +  margin  > CLUTTER_STAGE_HEIGHT() )
+					{
+						shift_list(app, step);
+					}
+				}
+				else
+				{
+					if( y - margin  < 0 )
+					{
+						shift_list(app, step);
+					}
+				}
+			}
+
 			GdkPixbuf       *pixbuf;
 			MediaItem & item = app->items[i];
 
@@ -92,19 +142,25 @@ void adjust_selection( App * app, int step )
 
 			clutter_label_set_color( CLUTTER_LABEL( actor ), &highlight_color );	
 
+#define SCALE_LABEL
+#ifdef SCALE_LABEL
 			g_object_set (label->scale_behave,
 				"scale-begin", 1.0,
 				"scale-end", 1.2,
 				NULL);
+#endif
+
 		}
 		else if( i == prev_selected )
 		{
 			clutter_label_set_color( CLUTTER_LABEL(actor), &normal_color );	
 
+#ifdef SCALE_LABEL
 			g_object_set (label->scale_behave,
 				"scale-begin", 1.2,
 				"scale-end", 1.0,
 				NULL);
+#endif
 		}
 		else
 		{
@@ -113,21 +169,6 @@ void adjust_selection( App * app, int step )
 				"scale-end", 1.0,
 				NULL);
 		}
-
-		// TODO shift the list when we get near the bottom or top
-		/*
-		knot[0].x = clutter_actor_get_x(actor);
-		knot[0].y = clutter_actor_get_y(actor);
-		knot[1].x = clutter_actor_get_x(actor);
-		knot[1].y = clutter_actor_get_y(actor) + 50 * step;
-
-		clutter_effect_move ( app->effect_template,
-			actor,
-			knot,
-			2,
-			NULL,
-			NULL);
-		*/
 	}
 		
 	clutter_timeline_start (app->timeline);
@@ -319,19 +360,19 @@ int main (int argc, char *argv[])
 	}
 
 	App	*app;
+	app = g_new0(App, 1);
 
-	ClutterActor    *stage, *hbox;
+	ClutterActor    *hbox;
 	ClutterColor    bg_color = { 0, 0, 0, 255 };
 
 	clutter_init (&argc, &argv);
 
-	stage = clutter_stage_get_default ();
-	clutter_stage_fullscreen( CLUTTER_STAGE (stage) );
-	clutter_stage_set_color( CLUTTER_STAGE (stage), &bg_color );
+	app->stage = clutter_stage_get_default ();
+//	clutter_stage_fullscreen( CLUTTER_STAGE (stage) );
+	clutter_stage_set_color( CLUTTER_STAGE (app->stage), &bg_color );
 
 
 	// Initialize the app properties
-	app = g_new0(App, 1);
 	app->timeline = clutter_timeline_new ( 15, 90);
 	app->alpha_ramp = clutter_alpha_new_full (
 			app->timeline, CLUTTER_ALPHA_SINE_HALF, NULL, NULL);
@@ -346,7 +387,7 @@ int main (int argc, char *argv[])
 	clutter_actor_set_position( hbox, 0, 0 );
 	clutter_box_set_default_padding ( CLUTTER_BOX (hbox), 10, 10, 10, 10 );
 	clutter_actor_show (hbox);
-	clutter_container_add_actor ( CLUTTER_CONTAINER (stage), hbox );
+	clutter_container_add_actor ( CLUTTER_CONTAINER (app->stage), hbox );
 
 
 
@@ -382,8 +423,8 @@ int main (int argc, char *argv[])
 
 	loadMediaDir( dir, app);
 
-	g_signal_connect (stage, "button-press-event", G_CALLBACK (input_cb), app);
-	g_signal_connect (stage, "key-release-event", G_CALLBACK (input_cb), app);
+	g_signal_connect ( app->stage, "button-press-event", G_CALLBACK (input_cb), app);
+	g_signal_connect ( app->stage, "key-release-event", G_CALLBACK (input_cb), app);
 
 	g_signal_connect (app->timeline,
 				"new-frame",
@@ -392,7 +433,7 @@ int main (int argc, char *argv[])
 
 	//clutter_timeline_start (app->timeline);
 
-	clutter_actor_show_all (stage);
+	clutter_actor_show_all (app->stage);
 
 	clutter_main();
 
