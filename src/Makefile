@@ -1,4 +1,4 @@
-SRC=trilogy.cc MediaLoader.cc MediaItem.cc
+SRC=trilogy.cc MediaLoader.cc MediaItem.cc csvparser.cc
 
 
 build:
