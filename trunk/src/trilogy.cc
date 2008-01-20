@@ -45,6 +45,7 @@ typedef struct App
 	ClutterActor	*cover;
 	ClutterActor	*stage;
 	ClutterActor	*vbox_left;
+	ClutterActor   *vbox_right;
 	vector<LabelItem *> labels;
 };
 
@@ -139,6 +140,11 @@ void adjust_selection( App * app, int step )
 			}
 
 			clutter_texture_set_pixbuf( CLUTTER_TEXTURE (app->cover), pixbuf, NULL);
+
+			// HACK until we can do right justify properly for the contents of the vbox
+			clutter_actor_set_position( app->vbox_right, 
+					CLUTTER_STAGE_WIDTH() - 100 - gdk_pixbuf_get_width(pixbuf), 
+					CLUTTER_STAGE_HEIGHT() / 2 - gdk_pixbuf_get_height(pixbuf) / 2 );
 
 			clutter_label_set_color( CLUTTER_LABEL( actor ), &highlight_color );	
 
@@ -392,10 +398,8 @@ int main (int argc, char *argv[])
 
 	// Show the movie cover for the selected movie title
 	{
-		ClutterActor *vbox_right;
-
-		vbox_right = clutter_vbox_new ();
-		clutter_box_set_default_padding ( CLUTTER_BOX (vbox_right), 10, 10, 10, 10 );
+		app->vbox_right = clutter_vbox_new ();
+		clutter_box_set_default_padding ( CLUTTER_BOX (app->vbox_right), 10, 10, 10, 10 );
 
 		// setup dummy cover
 		app->cover  = clutter_texture_new();
@@ -403,10 +407,19 @@ int main (int argc, char *argv[])
 		clutter_actor_set_position ( app->cover, 0, 0);
 		clutter_actor_show ( app->cover );
 
-		clutter_container_add_actor ( CLUTTER_CONTAINER (vbox_right), app->cover );
+		clutter_container_add_actor ( CLUTTER_CONTAINER (app->vbox_right), app->cover );
 
-		clutter_actor_show ( vbox_right );
-		clutter_box_pack_defaults ( CLUTTER_BOX (hbox), vbox_right );
+
+#ifdef CLUTTER_JUSTIFY_EXISTS 
+		clutter_actor_show ( app->vbox_right );
+		// FIXME we need a way to add to hbox but to justify far-right. The problem is that right now
+		// the width of the left column of media labels is 0 so when we pack the cover in it doesn't get
+		// pushed over any so we see the cover "undernearth" the labels. Maybe instead of putting it in an hbox
+		// we could just put it on the stage on 10 pixels from the right?
+		clutter_box_pack_defaults ( CLUTTER_BOX (hbox), app->vbox_right );
+#else
+		clutter_container_add_actor ( CLUTTER_CONTAINER (app->stage), app->vbox_right );
+#endif
 	}
 
 	loadMedia( app);
