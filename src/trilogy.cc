@@ -398,7 +398,7 @@ int main (int argc, char *argv[])
 		clutter_box_set_default_padding ( CLUTTER_BOX (vbox_right), 10, 10, 10, 10 );
 
 		// setup dummy cover
-		app->cover  = clutter_texture_new_from_pixbuf (NULL);
+		app->cover  = clutter_texture_new();
 
 		clutter_actor_set_position ( app->cover, 0, 0);
 		clutter_actor_show ( app->cover );
