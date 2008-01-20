@@ -6,19 +6,20 @@
 
 class MediaItem;
 
+// TODO rename MediaCatalog, MediaIndex?
 class MediaLoader
 {
 	public:
 
 		/**
-		 * Import new media items found in this directory path
-		 */
-		MediaLoader( const std::string & dir_path, bool recursive = false );
-
-		/** TODO
 		 * Import media items as found in this config file
 		 */
-		// MediaLoader( const std::string & config_path );
+		MediaLoader( const std::string & config = "~/.trilogy/catalog" );
+
+		/**
+		 * Import new media items found in this directory path
+		 */
+		void scan( const std::string & dir_path, bool recursive = false );
 
 		std::vector<MediaItem> getMediaItems() const;
 
@@ -32,6 +33,8 @@ class MediaLoader
 		bool hasExtension( const std::string & filename, const std::string & extension ) const;
 
 		std::vector<MediaItem> m_mediaItems;
+
+		std::string m_config;
 };
 
 #endif

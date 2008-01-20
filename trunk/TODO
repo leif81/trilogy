@@ -1,6 +1,14 @@
+CORE FEATURES
 - auto detect desktop resolution for fulll screen mode
 - support various sized images better (i.e. ones bigger then 1024x1024)
 - move image loading and displaying code into own class
-- merge code for using xdg-utils to play media
 - press key to jump to movie name (i.e. 't' jumps to taladegga nights)
 - problem displaying SVG's at any size other then 1024x1024
+
+- scan a directory for .avi and output results to .trilogy
+- drag and drop movie cover onto trilogy window and cache cover somewhere? .trilogy/covers/ ?
+
+
+EXTRAS
+- integrate with google image search, flickr, etc to return image results for each movie, tv show, etc ?
+- if the media file is removed, figure this out and preserve the link to the mover cover, update the db

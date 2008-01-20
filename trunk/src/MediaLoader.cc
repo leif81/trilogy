@@ -16,9 +16,11 @@
 
 #include <vector>
 #include <iostream>
+#include <fstream>
 
 #include "MediaLoader.h"
 #include "MediaItem.h"
+#include "csvparser.h"
 
 #include <algorithm>
 
@@ -47,7 +49,56 @@ namespace
 }
 
 
-MediaLoader::MediaLoader( const string & dir_path, bool recursive )
+MediaLoader::MediaLoader( const std::string & config ) : m_config(config)
+{
+	ifstream ifs( config.c_str() );
+	if( ifs.is_open() )
+	{
+		string line;
+		string name, media_path, cover_path;
+		CSVParser parser;
+		while( !ifs.eof() )
+		{
+			
+			getline( ifs, line );
+			if( line == "" )
+			{
+				continue;
+			}
+
+			parser << line;
+
+			parser >> name >> media_path >> cover_path;
+
+			if( media_path.empty() )
+			{
+				continue;
+			}
+
+			if( name.empty() )
+			{
+				char copy[media_path.length()];
+				strcpy( copy, media_path.c_str() );
+				name = basename(copy);	
+			}
+
+			if( cover_path.empty() )
+			{
+				cover_path = "../share/video-x-generic.svg";
+			}
+
+			m_mediaItems.push_back( MediaItem( name, cover_path , media_path ) );
+		}
+		ifs.close();
+	}
+	else
+	{
+		cout << config << " does not exist." << endl;
+	}
+}
+
+
+void MediaLoader::scan( const string & dir_path, bool recursive )
 {
 	DIR * dip = opendir( dir_path.c_str() );
 	if( dip == NULL )
@@ -104,6 +155,7 @@ MediaLoader::MediaLoader( const string & dir_path, bool recursive )
 	}
 	
 }
+
 
 vector<MediaItem> MediaLoader::getMediaItems() const
 {

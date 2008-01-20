@@ -175,13 +175,14 @@ void adjust_selection( App * app, int step )
 }
 
 
-void loadMediaDir( const string & dir, App * app )
+void loadMediaDir( App * app )
 {
 	try
 	{
 		app->labels.clear();
 
-		app->items = MediaLoader(dir).getMediaItems();
+		MediaLoader loader("../share/catalog");
+		app->items = loader.getMediaItems();
 
 		clutter_box_remove_all( CLUTTER_BOX (app->vbox_left ) );
 
@@ -217,20 +218,14 @@ void loadMediaDir( const string & dir, App * app )
 
 void play_selection( App * app )
 {
-	
 	MediaItem media = app->items[app->selected_item];
 
-	if( MediaLoader::isdirectory( media.getFilePath() ) )
+	// Quote it incase there are white spaces in the file path
+	//const string cmd = "xdg-open \"" + media.getFilePath() + "\"";
+	const string cmd = "mplayer \"" + media.getFilePath() + "\"";
+	if( system( cmd.c_str() ) == - 1 )
 	{
-		loadMediaDir( media.getFilePath(), app );
-	}
-	else
-	{
-		const string cmd = "xdg-open \"" + media.getFilePath() + "\"";
-		if( system( cmd.c_str() ) == - 1 )
-		{
-			throw string("can't open file");
-		}
+		throw string("can't open file");
 	}
 }
 
@@ -352,13 +347,6 @@ on_timeline_new_frame (ClutterTimeline *timeline, gint frame_num, App *app)
 
 int main (int argc, char *argv[])
 {
-	string dir = ".";
-
-	if( argc > 1 )
-	{
-		dir = argv[1];	
-	}
-
 	App	*app;
 	app = g_new0(App, 1);
 
@@ -368,7 +356,7 @@ int main (int argc, char *argv[])
 	clutter_init (&argc, &argv);
 
 	app->stage = clutter_stage_get_default ();
-//	clutter_stage_fullscreen( CLUTTER_STAGE (stage) );
+	clutter_stage_fullscreen( CLUTTER_STAGE (app->stage) );
 	clutter_stage_set_color( CLUTTER_STAGE (app->stage), &bg_color );
 
 
@@ -421,7 +409,7 @@ int main (int argc, char *argv[])
 		clutter_box_pack_defaults ( CLUTTER_BOX (hbox), vbox_right );
 	}
 
-	loadMediaDir( dir, app);
+	loadMediaDir( app);
 
 	g_signal_connect ( app->stage, "button-press-event", G_CALLBACK (input_cb), app);
 	g_signal_connect ( app->stage, "key-release-event", G_CALLBACK (input_cb), app);
