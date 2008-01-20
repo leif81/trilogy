@@ -175,7 +175,7 @@ void adjust_selection( App * app, int step )
 }
 
 
-void loadMediaDir( App * app )
+void loadMedia( App * app )
 {
 	try
 	{
@@ -409,7 +409,7 @@ int main (int argc, char *argv[])
 		clutter_box_pack_defaults ( CLUTTER_BOX (hbox), vbox_right );
 	}
 
-	loadMediaDir( app);
+	loadMedia( app);
 
 	g_signal_connect ( app->stage, "button-press-event", G_CALLBACK (input_cb), app);
 	g_signal_connect ( app->stage, "key-release-event", G_CALLBACK (input_cb), app);
