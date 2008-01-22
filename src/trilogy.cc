@@ -27,10 +27,15 @@
 
 using namespace std;
 
-typedef struct LabelItem
+class LabelItem
 {
-   ClutterActor     *actor;
-   ClutterBehaviour *rotate_behave, *opacity_behave, *scale_behave;
+	public:
+		LabelItem( MediaItem & mi ) : media(mi), visible(true) {};
+
+		MediaItem media;
+		bool visible;
+		ClutterActor     *actor;
+		ClutterBehaviour *rotate_behave, *opacity_behave, *scale_behave;
 };
 
 typedef struct App
@@ -39,17 +44,66 @@ typedef struct App
 	ClutterAlpha    *alpha_sine_inc, *alpha_ramp;
 	ClutterEffectTemplate *effect_template;
 
-	vector<MediaItem> items;
-	//vector<MediaItem>::const_iterator selected_item;
-	int selected_item;
 	ClutterActor	*cover;
 	ClutterActor	*stage;
 	ClutterActor	*vbox_left;
 	ClutterActor   *vbox_right;
+	ClutterActor   *filter;
+
 	vector<LabelItem *> labels;
+	vector<LabelItem *>::iterator selected_item;
 };
 
 
+
+/**
+ * Change the selected label item by the step amount
+ *
+ * @brief step	move this many locations from the current selection
+ */
+vector<LabelItem*>::iterator find_label(int step, App * app)
+{
+	vector<LabelItem*>::iterator find = app->selected_item;
+
+	while( step != 0 )
+	{
+		if( step > 0 )
+		{
+			vector<LabelItem*>::iterator prev = find;
+			find++;
+			if( find == app->labels.end() )
+			{
+				return prev;
+			}
+
+			LabelItem * label = *find;
+			if( label->visible )
+			{
+				step--;
+			}
+		}
+		else if( step < 0 )
+		{
+			if( find == app->labels.begin() )
+			{
+				return find;
+			}
+
+			find--;
+			LabelItem * label = *find;
+			if( label->visible )
+			{
+				step++;
+			}
+		}
+	}
+	return find;
+}
+
+
+
+bool search_mode =false;
+string search_string;
 
 ClutterColor highlight_color = { 255, 255, 0, 255 };
 ClutterColor normal_color = { 255, 255, 255, 155 };
@@ -57,17 +111,17 @@ ClutterColor normal_color = { 255, 255, 255, 155 };
 // shift the list when we get near the bottom or top
 void shift_list( App * app, int step )
 {
-
 	ClutterKnot knot[2];
 
 	gint top_padding, bottom_padding;
 
 	clutter_box_get_default_padding( CLUTTER_BOX(app->vbox_left), &top_padding, NULL, &bottom_padding, NULL );
 
-	for( int i=0; i < app->labels.size(); ++i )
+	ClutterBoxChild * child;
+	
+	for( int i=0; clutter_box_query_nth_child( CLUTTER_BOX(app->vbox_left), i, child ); ++i )
 	{
-		LabelItem * label = app->labels[i];
-		ClutterActor * actor = label->actor;
+		ClutterActor * actor = CLUTTER_ACTOR( child );
 
 		knot[0].x = clutter_actor_get_x(actor);
 		knot[0].y = clutter_actor_get_y(actor);
@@ -83,37 +137,95 @@ void shift_list( App * app, int step )
 	}
 }
 
-void adjust_selection( App * app, int step )
+
+LabelItem * select_label( vector<LabelItem*>::iterator it, App *app )
 {
-	int prev_selected = app->selected_item;
+	app->selected_item = it;
+	LabelItem * label = *it;
 
-	app->selected_item += step;
-	if( app->selected_item < 0 )
+	GdkPixbuf       *pixbuf;
+
+	pixbuf = gdk_pixbuf_new_from_file ( label->media.getCoverPath().c_str(), NULL);
+
+	if (!pixbuf)
 	{
-		app->selected_item = 0;
-	}
-	else if ( app->selected_item >= app->items.size() )
-	{
-		app->selected_item = app->items.size() - 1;
+		//g_error("pixbuf load failed '%s'", item.getCoverPath().c_str());
+
+		// Just create a 1x1 transparent pixbuf and draw that 
+		pixbuf = gdk_pixbuf_new ( GDK_COLORSPACE_RGB, 1, 8, 1, 1);
 	}
 
+	clutter_texture_set_pixbuf( CLUTTER_TEXTURE (app->cover), pixbuf, NULL);
+
+	// HACK until we can do right justify properly for the contents of the vbox
+	clutter_actor_set_position( app->vbox_right, 
+			CLUTTER_STAGE_WIDTH() - 100 - gdk_pixbuf_get_width(pixbuf), 
+			CLUTTER_STAGE_HEIGHT() / 2 - gdk_pixbuf_get_height(pixbuf) / 2 );
+
+	clutter_label_set_color( CLUTTER_LABEL( label->actor ), &highlight_color );	
+
+#ifdef SCALE_LABEL
+	g_object_set (label->scale_behave,
+		"scale-begin", 1.0,
+		"scale-end", 1.05,
+		NULL);
+#endif
+
+	return label;
+}
+
+static bool first_movement = true;
+
+void make_selection( App * app, vector<LabelItem*>::iterator it_selected )
+{
+	if( !first_movement )
+	{
+		LabelItem *prev = *app->selected_item;
+#ifdef SCALE_LABEL
+		g_object_set (prev->scale_behave,
+			"scale-begin", 1.05,
+			"scale-end", 1.0,
+			NULL);
+#endif
+		clutter_label_set_color( CLUTTER_LABEL(prev->actor), &normal_color );	
+	}
+	else
+	{
+		first_movement = false;
+	}
+
+
+
+	// FIXME this whole query thing doesn't seem to work at all
+	ClutterBoxChild * child;
+	for( int i=0; clutter_box_query_nth_child( CLUTTER_BOX(app->vbox_left), i, child ); ++i )
+	{
+		ClutterActor * actor = CLUTTER_ACTOR( child );
+#ifdef SCALE_LABEL
+		g_object_set (actor->scale_behave,
+			"scale-begin", 1.0,
+			"scale-end", 1.0,
+			NULL);
+#endif
+	}
 	
-	for( int i=0; i < app->labels.size(); ++i )
-	{
-		LabelItem * label = app->labels[i];
-		ClutterActor * actor = label->actor;
+	select_label( it_selected, app);
 
-		if( i == app->selected_item )
+#if SCROLL_LIST
+	// Handle selected item
 		{
+
+			LabelItem * label = *app->selected_item;
+
 			// check if we need to shift list to stay on screen
 			{
 				gint x,y;
-				clutter_actor_get_abs_position( actor, &x, &y );
+				clutter_actor_get_abs_position( label->actor, &x, &y );
 				const int margin = 10; // pixels from edge of screen that triggers shift
 
 				if( step > 0 )
 				{
-					if( y + clutter_actor_get_height(actor) +  margin  > CLUTTER_STAGE_HEIGHT() )
+					if( y + clutter_actor_get_height(label->actor) +  margin  > CLUTTER_STAGE_HEIGHT() )
 					{
 						shift_list(app, step);
 					}
@@ -127,57 +239,49 @@ void adjust_selection( App * app, int step )
 				}
 			}
 
-			GdkPixbuf       *pixbuf;
-			MediaItem & item = app->items[i];
-
-			pixbuf = gdk_pixbuf_new_from_file ( item.getCoverPath().c_str(), NULL);
-			if (!pixbuf)
-			{
-				//g_error("pixbuf load failed '%s'", item.getCoverPath().c_str());
-
-				// Just create a 1x1 transparent pixbuf and draw that 
-				pixbuf = gdk_pixbuf_new ( GDK_COLORSPACE_RGB, 1, 8, 1, 1);
-			}
-
-			clutter_texture_set_pixbuf( CLUTTER_TEXTURE (app->cover), pixbuf, NULL);
-
-			// HACK until we can do right justify properly for the contents of the vbox
-			clutter_actor_set_position( app->vbox_right, 
-					CLUTTER_STAGE_WIDTH() - 100 - gdk_pixbuf_get_width(pixbuf), 
-					CLUTTER_STAGE_HEIGHT() / 2 - gdk_pixbuf_get_height(pixbuf) / 2 );
-
-			clutter_label_set_color( CLUTTER_LABEL( actor ), &highlight_color );	
-
-#define SCALE_LABEL
-#ifdef SCALE_LABEL
-			g_object_set (label->scale_behave,
-				"scale-begin", 1.0,
-				"scale-end", 1.2,
-				NULL);
-#endif
-
 		}
-		else if( i == prev_selected )
-		{
-			clutter_label_set_color( CLUTTER_LABEL(actor), &normal_color );	
-
-#ifdef SCALE_LABEL
-			g_object_set (label->scale_behave,
-				"scale-begin", 1.2,
-				"scale-end", 1.0,
-				NULL);
 #endif
+
+	clutter_timeline_start (app->timeline);
+}
+
+
+void make_selection( App * app, int step )
+{
+	make_selection( app, find_label( step, app ) );
+}
+
+
+void redraw_list( const string & filter, App * app )
+{
+
+	clutter_box_remove_all( CLUTTER_BOX (app->vbox_left ) );
+
+	bool first_label = true;
+
+	vector<LabelItem*>::iterator it = app->labels.begin();
+	for( ; it != app->labels.end(); ++it )
+	{
+		LabelItem * label = *it;
+
+		const string text = clutter_label_get_text( CLUTTER_LABEL(label->actor) );
+		if( filter.empty() || text.find( filter ) != string::npos )
+		{
+			clutter_box_pack_defaults ( CLUTTER_BOX (app->vbox_left), label->actor );
+			label->visible = true;
+
+			// Highlight the first item in the list when searching
+			if( search_mode && first_label )
+			{
+				first_label = false;	
+				make_selection(app, it);
+			}
 		}
 		else
 		{
-			g_object_set (label->scale_behave,
-				"scale-begin", 1.0,
-				"scale-end", 1.0,
-				NULL);
+			label->visible = false;
 		}
 	}
-		
-	clutter_timeline_start (app->timeline);
 }
 
 
@@ -186,18 +290,16 @@ void loadMedia( App * app )
 	try
 	{
 		app->labels.clear();
-
-		MediaLoader loader("../share/catalog");
-		app->items = loader.getMediaItems();
-
 		clutter_box_remove_all( CLUTTER_BOX (app->vbox_left ) );
 
-		vector<MediaItem>::const_iterator it = app->items.begin();
-		for( ; it < app->items.end(); ++it )
+		MediaLoader loader("../share/catalog");
+		vector<MediaItem> items = loader.getMediaItems();
+		vector<MediaItem>::iterator it = items.begin();
+		for( ; it < items.end(); ++it )
 		{
-			const MediaItem item = *it;
+			MediaItem &item = *it;
 
-			LabelItem * label = g_new0(LabelItem, 1);
+			LabelItem * label = new LabelItem(item);
 			label->actor = clutter_label_new_with_text ( "Sans Bold 24", item.getName().c_str() );
 			clutter_label_set_color ( CLUTTER_LABEL (label->actor), &normal_color );
 			clutter_actor_show ( label->actor );
@@ -216,15 +318,12 @@ void loadMedia( App * app )
 		cout << "Problem loading media:"	<< e << endl;
 		exit(1);
 	}
-
-	app->selected_item = 0;
-	adjust_selection( app, 0 );
 }
 
 
 void play_selection( App * app )
 {
-	MediaItem media = app->items[app->selected_item];
+	MediaItem & media = dynamic_cast<LabelItem*>(*app->selected_item)->media;
 
 	// Quote it incase there are white spaces in the file path
 	//const string cmd = "xdg-open \"" + media.getFilePath() + "\"";
@@ -233,6 +332,39 @@ void play_selection( App * app )
 	{
 		throw string("can't open file");
 	}
+}
+
+
+void stop_search( App * app )
+{
+	search_mode = false;
+	search_string.clear();
+	redraw_list( search_string, app ); // unfilter
+
+	clutter_actor_hide ( app->filter );
+	clutter_label_set_text( CLUTTER_LABEL(app->filter), "filter: " );
+}
+
+void begin_search( int letter, App * app )
+{
+	if( letter == CLUTTER_BackSpace )
+	{
+		if( !search_string.empty() )
+		{
+			search_string.erase( --search_string.end() );
+		}
+	}
+	else
+	{
+		search_string += letter; 
+	}
+
+	redraw_list( search_string, app );
+
+	string filter = "filter: " + search_string;
+	clutter_label_set_text( CLUTTER_LABEL(app->filter), filter.c_str() );
+
+	cout << search_string << endl;
 }
 
 
@@ -270,47 +402,69 @@ void input_cb (ClutterStage *stage, ClutterEvent *event, gpointer data)
 
 		// g_print ("*** key press event (key:%c) ***\n", clutter_key_event_symbol (kev));
 
+
 		switch (clutter_key_event_symbol (kev))
 		{
-			case CLUTTER_Escape:
-			//case CLUTTER_q:
-				clutter_main_quit ();
+
+			case CLUTTER_Shift_L:
+			case CLUTTER_Shift_R:
+
 				break;
 
-			case CLUTTER_f:
-				// FIXME this doesn't work - problem with clutter?
-				if( fullscreen )
+			case CLUTTER_Escape:
+			//case CLUTTER_q:
+				if( search_mode )
 				{
-					clutter_stage_unfullscreen( CLUTTER_STAGE (app->stage) );
+					stop_search(app);
 				}
 				else
 				{
-					clutter_stage_fullscreen( CLUTTER_STAGE (app->stage) );
+					clutter_main_quit ();
 				}
-				fullscreen != fullscreen; 
+				break;
+
+			case CLUTTER_f:
+
+				if( search_mode )
+				{
+					begin_search( clutter_key_event_symbol(kev), app );
+				}
+				else
+				{
+					// FIXME this doesn't work - problem with clutter?
+					if( fullscreen )
+					{
+						clutter_stage_unfullscreen( CLUTTER_STAGE (app->stage) );
+					}
+					else
+					{
+						clutter_stage_fullscreen( CLUTTER_STAGE (app->stage) );
+					}
+					fullscreen != fullscreen; 
+				}
 				break;
 
 			case CLUTTER_Up:
 
-				adjust_selection( app, -1 );
+				make_selection( app, -1 );
 
 				break;
 			
 			case CLUTTER_Down:
 
-				adjust_selection( app, 1 );
+				make_selection( app, 1 );
 
 				break;
 
 			case CLUTTER_Page_Up:
 
-				adjust_selection( app, -5 );
+				make_selection( app, 5 );
 
 				break;
 
 			case CLUTTER_Page_Down:
 
-				adjust_selection( app, 5 );
+				make_selection( app, 5 );
 
 				break;
 
@@ -330,9 +484,40 @@ void input_cb (ClutterStage *stage, ClutterEvent *event, gpointer data)
 
 			case CLUTTER_Return:
 
+				stop_search(app);
 				play_selection( app );
 				
 				break;
+		
+			case CLUTTER_slash:
+
+				if( search_mode )
+				{
+					begin_search( clutter_key_event_symbol(kev), app );
+				}
+				else
+				{
+					clutter_actor_show ( app->filter );
+					search_mode = true;
+				}
+				
+				break;
+
+			case CLUTTER_BackSpace:
+
+				if( search_mode )
+				{
+					begin_search( clutter_key_event_symbol(kev), app );
+				}
+
+				break;
+
+			default:
+
+				if( search_mode )
+				{
+					begin_search( clutter_key_event_symbol(kev), app );
+				}
 		}
 	}
 }
@@ -364,7 +549,6 @@ int main (int argc, char *argv[])
 	app->stage = clutter_stage_get_default ();
 	clutter_stage_fullscreen( CLUTTER_STAGE (app->stage) );
 	clutter_stage_set_color( CLUTTER_STAGE (app->stage), &bg_color );
-
 
 	// Initialize the app properties
 	app->timeline = clutter_timeline_new ( 15, 90);
@@ -422,7 +606,21 @@ int main (int argc, char *argv[])
 #endif
 	}
 
+	// Filter text prompt
+	{
+			app->filter = clutter_label_new_with_text ( "Sans Bold 18", "filter: " );
+			clutter_label_set_color ( CLUTTER_LABEL (app->filter), &normal_color );
+
+			clutter_label_set_line_wrap( CLUTTER_LABEL(app->filter), FALSE );
+
+			clutter_actor_set_position( app->filter, 100, CLUTTER_STAGE_HEIGHT() - 100 ); 
+
+			clutter_container_add_actor ( CLUTTER_CONTAINER (app->stage), app->filter );
+	}
+
 	loadMedia( app);
+
+	make_selection( app, app->labels.begin() );
 
 	g_signal_connect ( app->stage, "button-press-event", G_CALLBACK (input_cb), app);
 	g_signal_connect ( app->stage, "key-release-event", G_CALLBACK (input_cb), app);
@@ -435,6 +633,7 @@ int main (int argc, char *argv[])
 	//clutter_timeline_start (app->timeline);
 
 	clutter_actor_show_all (app->stage);
+	clutter_actor_hide ( app->filter );
 
 	clutter_main();
 
