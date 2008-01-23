@@ -1,6 +1,5 @@
 #summary summary of features to be worked on
 
-= Planned Features =
  * "favourites" feature
  * "viewed" history
  * quick search
