@@ -1,0 +1,9 @@
+#summary summary of features to be worked on
+
+= Planned Features =
+ * "favourites" feature
+ * "viewed" history
+ * quick search
+ * drag and drop movie covers
+ * scanning for media files
+ * imdb hooks for pulling movie and tv show meta data
