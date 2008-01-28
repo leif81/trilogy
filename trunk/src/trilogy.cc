@@ -197,17 +197,17 @@ void make_selection( App * app, vector<LabelItem*>::iterator it_selected )
 
 
 	// FIXME this whole query thing doesn't seem to work at all
+#ifdef SCALE_LABEL
 	ClutterBoxChild * child;
 	for( int i=0; clutter_box_query_nth_child( CLUTTER_BOX(app->vbox_left), i, child ); ++i )
 	{
 		ClutterActor * actor = CLUTTER_ACTOR( child );
-#ifdef SCALE_LABEL
 		g_object_set (actor->scale_behave,
 			"scale-begin", 1.0,
 			"scale-end", 1.0,
 			NULL);
-#endif
 	}
+#endif
 	
 	select_label( it_selected, app);
 
@@ -440,7 +440,7 @@ void input_cb (ClutterStage *stage, ClutterEvent *event, gpointer data)
 					{
 						clutter_stage_fullscreen( CLUTTER_STAGE (app->stage) );
 					}
-					fullscreen != fullscreen; 
+					fullscreen = !fullscreen; 
 				}
 				break;
 
@@ -529,10 +529,12 @@ on_timeline_new_frame (ClutterTimeline *timeline, gint frame_num, App *app)
 	// for each actor move 5 pixels ?
 	
 
+	/*
 	if (frame_num == clutter_timeline_get_n_frames (timeline)/2)
 	{
 		// printf("half way\n");
 	}
+	*/
 }
 
 
