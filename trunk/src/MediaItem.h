@@ -20,8 +20,8 @@ class MediaItem
 	private:
 
 		std::string m_name;
-		std::string m_filePath;	
 		std::string m_coverPath;
+		std::string m_filePath;	
 };
 
 #endif
