@@ -1,10 +1,15 @@
 #!/bin/bash
+#
+# Trilogy catalog generator
+#
 
 EXTENSIONS="avi mkv wmv mpg mpeg mp4 mov m2v"
 
 SCAN_DIR=$1
 
 OUT_FILE=/tmp/results
+
+echo "# Trilogy catalog file" > $OUT_FILE
 
 for ext in $EXTENSIONS; do
 	CMD="find $SCAN_DIR -follow -name '*.$ext' -printf ',\"%p\",\n'"
