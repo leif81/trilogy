@@ -52,6 +52,8 @@ typedef struct App
 
 	vector<LabelItem *> labels;
 	vector<LabelItem *>::iterator selected_item;
+
+	bool playing;
 };
 
 
@@ -178,6 +180,8 @@ static bool first_movement = true;
 
 void make_selection( App * app, vector<LabelItem*>::iterator it_selected )
 {
+//	cout << "moving" << endl;
+
 	if( !first_movement )
 	{
 		LabelItem *prev = *app->selected_item;
@@ -242,7 +246,7 @@ void make_selection( App * app, vector<LabelItem*>::iterator it_selected )
 		}
 #endif
 
-	clutter_timeline_start (app->timeline);
+//	clutter_timeline_start (app->timeline);
 }
 
 
@@ -285,14 +289,14 @@ void redraw_list( const string & filter, App * app )
 }
 
 
-void loadMedia( App * app )
+void loadMedia( App * app, const string & catalog_path )
 {
 	try
 	{
 		app->labels.clear();
 		clutter_box_remove_all( CLUTTER_BOX (app->vbox_left ) );
 
-		MediaLoader loader("../share/catalog");
+		MediaLoader loader(catalog_path);
 		vector<MediaItem> items = loader.getMediaItems();
 		vector<MediaItem>::iterator it = items.begin();
 		for( ; it < items.end(); ++it )
@@ -332,6 +336,8 @@ void play_selection( App * app )
 	{
 		throw string("can't open file");
 	}
+
+	app->playing = true;
 }
 
 
@@ -363,16 +369,20 @@ void begin_search( int letter, App * app )
 
 	string filter = "filter: " + search_string;
 	clutter_label_set_text( CLUTTER_LABEL(app->filter), filter.c_str() );
-
-	cout << search_string << endl;
 }
 
 
 /* input handler */
 void input_cb (ClutterStage *stage, ClutterEvent *event, gpointer data)
 {
-
 	App *app = (App*)data;
+
+	// HACK to throw away the character that caused the player to quit (i.e. 'q' )
+	if( app->playing )
+	{
+		app->playing = false;
+		return;
+	}
 
 	if (event->type == CLUTTER_BUTTON_PRESS)
 	{
@@ -392,9 +402,15 @@ void input_cb (ClutterStage *stage, ClutterEvent *event, gpointer data)
 		{
 			//			clutter_actor_hide (e);
 		}
-
 	}
-	else if (event->type == CLUTTER_KEY_RELEASE)
+	else if( event->type == CLUTTER_SCROLL )
+	{
+
+		// TODO handling mouse wheel scrolling
+		// ClutterScrollDirection can be CLUTTER_SCROLL_UP CLUTTER_SCROLL_DOWN
+		cout << "scroll is unhandled currently" << endl;
+	}
+	else if (event->type == CLUTTER_KEY_PRESS)
 	{
 		static gint fullscreen = TRUE;
 
@@ -402,17 +418,15 @@ void input_cb (ClutterStage *stage, ClutterEvent *event, gpointer data)
 
 		// g_print ("*** key press event (key:%c) ***\n", clutter_key_event_symbol (kev));
 
-
 		switch (clutter_key_event_symbol (kev))
 		{
-
 			case CLUTTER_Shift_L:
 			case CLUTTER_Shift_R:
 
 				break;
 
 			case CLUTTER_Escape:
-			//case CLUTTER_q:
+
 				if( search_mode )
 				{
 					stop_search(app);
@@ -422,6 +436,7 @@ void input_cb (ClutterStage *stage, ClutterEvent *event, gpointer data)
 					clutter_main_quit ();
 				}
 				break;
+
 
 			case CLUTTER_f:
 
@@ -434,10 +449,12 @@ void input_cb (ClutterStage *stage, ClutterEvent *event, gpointer data)
 					// FIXME this doesn't work - problem with clutter?
 					if( fullscreen )
 					{
+						cout << "setting windowed mode" << endl;
 						clutter_stage_unfullscreen( CLUTTER_STAGE (app->stage) );
 					}
 					else
 					{
+						cout << "setting fullscreen mode" << endl;
 						clutter_stage_fullscreen( CLUTTER_STAGE (app->stage) );
 					}
 					fullscreen = !fullscreen; 
@@ -484,7 +501,7 @@ void input_cb (ClutterStage *stage, ClutterEvent *event, gpointer data)
 
 			case CLUTTER_Return:
 
-				stop_search(app);
+				//stop_search(app);
 				play_selection( app );
 				
 				break;
@@ -520,12 +537,21 @@ void input_cb (ClutterStage *stage, ClutterEvent *event, gpointer data)
 				}
 		}
 	}
+	else if (event->type == CLUTTER_KEY_RELEASE)
+	{
+		// ignore
+	}
+	else
+	{
+		cout << "other unhandled input type" << endl;
+	}
 }
 
 
 void
 on_timeline_new_frame (ClutterTimeline *timeline, gint frame_num, App *app)
 {
+	//cout << "new frame" << endl;
 	// for each actor move 5 pixels ?
 	
 
@@ -548,12 +574,21 @@ int main (int argc, char *argv[])
 
 	clutter_init (&argc, &argv);
 
+	string catalog_path = "../share/catalog";
+
+	if( argc > 1 )
+	{
+		catalog_path = argv[1];
+	}
+
+	app->playing = false;
+
 	app->stage = clutter_stage_get_default ();
 	clutter_stage_fullscreen( CLUTTER_STAGE (app->stage) );
 	clutter_stage_set_color( CLUTTER_STAGE (app->stage), &bg_color );
 
 	// Initialize the app properties
-	app->timeline = clutter_timeline_new ( 15, 90);
+	app->timeline = clutter_timeline_new ( 1, 90);
 	app->alpha_ramp = clutter_alpha_new_full (
 			app->timeline, CLUTTER_ALPHA_SINE_HALF, NULL, NULL);
 
@@ -610,7 +645,7 @@ int main (int argc, char *argv[])
 
 	// Filter text prompt
 	{
-			app->filter = clutter_label_new_with_text ( "Sans Bold 18", "filter: " );
+			app->filter = clutter_label_new_with_text ( "Sans Italic 18", "filter: " );
 			clutter_label_set_color ( CLUTTER_LABEL (app->filter), &normal_color );
 
 			clutter_label_set_line_wrap( CLUTTER_LABEL(app->filter), FALSE );
@@ -620,17 +655,16 @@ int main (int argc, char *argv[])
 			clutter_container_add_actor ( CLUTTER_CONTAINER (app->stage), app->filter );
 	}
 
-	loadMedia( app);
+	loadMedia( app, catalog_path );
 
 	make_selection( app, app->labels.begin() );
 
 	g_signal_connect ( app->stage, "button-press-event", G_CALLBACK (input_cb), app);
+	g_signal_connect ( app->stage, "key-press-event", G_CALLBACK (input_cb), app);
 	g_signal_connect ( app->stage, "key-release-event", G_CALLBACK (input_cb), app);
+	g_signal_connect ( app->stage, "scroll-event", G_CALLBACK (input_cb), app);
 
-	g_signal_connect (app->timeline,
-				"new-frame",
-				G_CALLBACK(on_timeline_new_frame),
-				app);
+	g_signal_connect (app->timeline, "new-frame", G_CALLBACK(on_timeline_new_frame), app);
 
 	//clutter_timeline_start (app->timeline);
 
