@@ -20,6 +20,8 @@
 #include <glib.h>
 #include <glib/gprintf.h>
 
+#include <sstream>
+
 #include "MediaLoader.h"
 #include "MediaItem.h"
 
@@ -289,10 +291,15 @@ void redraw_list( const string & filter, App * app )
 }
 
 
+
 void loadMedia( App * app, const string & catalog_path )
 {
 	try
 	{
+		const int label_height = CLUTTER_STAGE_HEIGHT()/20;
+		ostringstream oss;
+		oss << "Sans Bold " << label_height << "px";
+		
 		app->labels.clear();
 		clutter_box_remove_all( CLUTTER_BOX (app->vbox_left ) );
 
@@ -304,7 +311,7 @@ void loadMedia( App * app, const string & catalog_path )
 			MediaItem &item = *it;
 
 			LabelItem * label = new LabelItem(item);
-			label->actor = clutter_label_new_with_text ( "Sans Bold 24", item.getName().c_str() );
+			label->actor = clutter_label_new_with_text ( oss.str().c_str(), item.getName().c_str() );
 			clutter_label_set_color ( CLUTTER_LABEL (label->actor), &normal_color );
 			clutter_actor_show ( label->actor );
 			label->scale_behave = clutter_behaviour_scale_new ( 
