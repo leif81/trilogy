@@ -2,11 +2,9 @@ CORE FEATURES
 - auto detect desktop resolution for fulll screen mode
 - support various sized images better (i.e. ones bigger then 1024x1024)
 - move image loading and displaying code into own class
-- press key to jump to movie name (i.e. 't' jumps to taladegga nights)
 - problem displaying SVG's at any size other then 1024x1024
-
-- scan a directory for .avi and output results to .trilogy
 - drag and drop movie cover onto trilogy window and cache cover somewhere? .trilogy/covers/ ?
+- list scrolling: pgup, pgdown, home, end, etc
 
 
 EXTRAS
