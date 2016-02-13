@@ -6,9 +6,9 @@
 
 == Build it
 
-$ cd src
-$ make
+ $ cd src
+ $ make
 
 == Run it
 
-$ ./trilogy
+ $ ./trilogy
