@@ -1,0 +1,14 @@
+= Trilogy
+
+== Requirements
+	
+* clutter 0.4
+
+== Build it
+
+$ cd src
+$ make
+
+== Run it
+
+$ ./trilogy
