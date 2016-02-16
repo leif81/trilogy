@@ -1,5 +1,9 @@
 = Trilogy
 
+== About
+
+Back before Netflix, and when I-Tunes coverflow was new and cool, I thought it'd be neat to have something similar for browsing a collection of movie files by swiping through a list of dvd covers.
+
 == Requirements
 	
 * clutter 0.4
